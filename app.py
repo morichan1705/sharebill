@@ -147,27 +147,45 @@ with tab1:
 # --- TAB 2: GHI HÓA ĐƠN ---
 with tab2:
     if 'current_items' not in st.session_state: st.session_state.current_items = []
-    st.subheader("🤖 Để AI nhập hộ bạn nhé")
+   
+    st.subheader("🤖 Nhập liệu nhanh AI")
     c_ai1, c_ai2 = st.columns(2)
+    
+    # Lấy thời gian thực để bơm vào Prompt cho AI suy luận
+    current_time_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+    
     with c_ai1:
-        up_f = st.file_uploader("📸 Quét ảnh bill", type=["jpg", "png", "jpeg"])
-        if up_f and st.button("✨ Ai đang căng mắt phân tích ảnh đây"):
+        up_f = st.file_uploader("📸 Nhập ảnh của bạn ở đây", type=["jpg", "png", "jpeg"])
+        if up_f and st.button("✨ Phân tích ảnh"):
             try:
                 img = PIL.Image.open(up_f); img.thumbnail((800, 800))
-                res = client.models.generate_content(model='gemini-2.5-flash', contents=["Đọc bill, trả về: TÊN|GIÁ|SL", img])
+                prompt_img = f"Hôm nay là {current_time_str}. Đọc bill, tìm ngày giờ hóa đơn. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL"
+                res = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt_img, img])
+                
                 for line in res.text.strip().split('\n'):
-                    p = line.split('|')
-                    if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
+                    line = line.strip()
+                    if line.upper().startswith("NGÀY:"):
+                        st.session_state.ai_date = line[5:].strip()
+                    else:
+                        p = line.split('|')
+                        if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
                 st.rerun()
             except Exception as e: st.error(e)
+            
     with c_ai2:
-        txt_ai = st.text_area("💬 Dán tin nhắn ở đây nè:")
-        if txt_ai and st.button("✨ Ai đang đọc tin nhắn của bạn đây"):
+        txt_ai = st.text_area("💬 Dán tin nhắn của bạn ở đây:")
+        if txt_ai and st.button("✨ Phân tích chữ"):
             try:
-                res = client.models.generate_content(model='gemini-2.5-flash', contents=f"Phân tích bill: TÊN|GIÁ|SL: {txt_ai}")
+                prompt_txt = f"Hôm nay là {current_time_str}. Đọc tin nhắn, tự suy luận ngày giờ đi ăn (nếu nói 'hôm qua', 'tối nay'). Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
+                res = client.models.generate_content(model='gemini-2.0-flash', contents=prompt_txt)
+                
                 for line in res.text.strip().split('\n'):
-                    p = line.split('|')
-                    if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
+                    line = line.strip()
+                    if line.upper().startswith("NGÀY:"):
+                        st.session_state.ai_date = line[5:].strip()
+                    else:
+                        p = line.split('|')
+                        if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
                 st.rerun()
             except Exception as e: st.error(e)
 
@@ -205,7 +223,11 @@ with tab2:
                 st.rerun()
     # --------------------------------------------------------
     st.write("---")
-    b_title = st.text_input("Tiêu đề bill:", value="Đi ăn")
+    # Tách làm 2 ô ngang nhau cho đẹp
+    c_info1, c_info2 = st.columns(2)
+    b_title = c_info1.text_input("Tiêu đề bill:", value="Đi ăn")
+    # Hiển thị ngày giờ AI quét được, hoặc ngày giờ hiện tại nếu AI không tìm thấy
+    b_date = c_info2.text_input("Thời gian (AI tự điền):", value=st.session_state.ai_date)
     b_payer = st.selectbox("Ai trả tiền?", list(st.session_state.members.keys()))
     use_g = st.selectbox("Chọn nhóm (để tick nhanh):", ["-- Chọn lẻ --"] + list(st.session_state.groups.keys()))
     def_m = list(st.session_state.members.keys())
@@ -247,23 +269,24 @@ with tab2:
         # ... (giữ nguyên logic method và preview) ...
         
         if st.button("💾 LƯU SỔ NỢ", type="primary"):
-            now = datetime.now().strftime("%d/%m/%Y %H:%M")
             st.session_state.history.append({
                 "id": time.time(), 
-                "date": now, 
-                "deadline": b_deadline, # Lưu giá trị (None hoặc chuỗi ngày)
+                "date": b_date, # Dùng ngày AI bắt được (hoặc người dùng đã sửa tay)
+                "deadline": b_deadline, 
                 "name": b_title, 
                 "amount": total_bill, 
                 "payer": b_payer, 
                 "splits": splits, 
                 "status": "unpaid", 
-                "paid_by": []
+                "paid_by": [],
+                "items": st.session_state.current_items.copy() # Lưu items cho Wrapped Tab 5
             })
-            st.session_state.current_items = []; save_data(); st.rerun()
-        if st.button("💾 LƯU SỔ NỢ", type="primary"):
-            now = datetime.now().strftime("%d/%m/%Y %H:%M")
-            st.session_state.history.append({"id": time.time(), "date": now, "name": b_title, "amount": total_bill, "payer": b_payer, "splits": splits, "status": "unpaid", "paid_by": [], "items": st.session_state.current_items.copy()})
-            st.session_state.current_items = []; save_data(); st.rerun()
+            # Reset lại dữ liệu sau khi lưu
+            st.session_state.current_items = []
+            st.session_state.ai_date = datetime.now().strftime("%d/%m/%Y %H:%M")
+            save_data()
+            st.success("Đã lưu!")
+            st.rerun()
 
 # --- TAB 3: CHỐT SỔ (Bù trừ nợ chéo & Có Deadline) ---
 with tab3:
@@ -452,28 +475,30 @@ with tab5:
     if not st.session_state.history:
         st.info("Chưa có dữ liệu đi chơi. Hãy lập kèo đi ăn ngay để mở khóa thống kê!")
     else:
-        # --- BỘ LỌC THỜI GIAN ---
-        # Lấy mốc thời gian hiện tại là Tháng 4/2026
+       # --- BỘ LỌC THỜI GIAN ---
         time_filter = st.radio("⏳ Chọn mốc thời gian xem báo cáo:", 
-                               ["Tháng này(Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
+                               ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
         st.write("---")
         
         # Tách danh sách bill theo mốc thời gian đã chọn
         filtered_history = []
         for b in st.session_state.history:
             try:
-                # Chuyển đổi chuỗi ngày tháng (VD: "26/04/2026 19:30") thành object ngày
-                date_str = b['date'].split(" ")[0]
-                date_obj = datetime.strptime(date_str, "%d/%m/%Y")
-                
-                if time_filter == "Tháng này (Tháng 4)":
-                    if date_obj.month == 4 and date_obj.year == 2026:
-                        filtered_history.append(b)
-                elif time_filter == "Từ đầu năm (2026)":
-                    if date_obj.year == 2026:
-                        filtered_history.append(b)
+                # Dùng Regex để moi chính xác định dạng dd/mm/yyyy ra, bất chấp AI viết dư dấu cách
+                match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', str(b['date']))
+                if match:
+                    d_month = int(match.group(2))
+                    d_year = int(match.group(3))
+                    
+                    # Dùng chữ "in" để kiểm tra từ khóa thay vì bắt khớp 100% từng dấu cách
+                    if "Tháng này" in time_filter:
+                        if d_month == 4 and d_year == 2026:
+                            filtered_history.append(b)
+                    elif "đầu năm" in time_filter:
+                        if d_year == 2026:
+                            filtered_history.append(b)
             except: 
-                pass # Bỏ qua nếu ngày tháng bị nhập sai định dạng
+                pass # Bỏ qua an toàn nếu bill bị lỗi ngày
                 
         # Nếu khoảng thời gian được chọn không có dữ liệu
         if not filtered_history:
