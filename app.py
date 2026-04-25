@@ -26,12 +26,12 @@ if 'logged_in' not in st.session_state:
 
 # GIAO DIỆN ĐĂNG NHẬP
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Sòng Phẳng</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Share Bills</h1>", unsafe_allow_html=True)
     tab_login, tab_reg = st.tabs(["Đăng nhập", "Đăng ký"])
     users = load_users()
     
     with tab_login:
-        l_user = st.text_input("Tài khoản:")
+        l_user = st.text_input("Tên bạn là gì:")
         l_pass = st.text_input("Mật khẩu:", type="password")
         if st.button("🚀 Đăng nhập", type="primary", use_container_width=True):
             if l_user in users and users[l_user] == l_pass:
@@ -39,16 +39,16 @@ if not st.session_state.logged_in:
                 st.session_state.username = l_user
                 st.rerun()
             else:
-                st.error("Sai tài khoản hoặc mật khẩu!")
+                st.error("Sai òi!")
     
     with tab_reg:
         r_user = st.text_input("Tạo tài khoản mới:")
         r_pass = st.text_input("Tạo mật khẩu:", type="password")
         if st.button("📝 Đăng ký", use_container_width=True):
-            if r_user in users: st.error("Tài khoản đã tồn tại!")
+            if r_user in users: st.error("Bạn đã có tài khoản rồi!")
             elif r_user and r_pass:
                 users[r_user] = r_pass; save_users(users)
-                st.success("Đăng ký thành công! Hãy quay lại tab Đăng nhập.")
+                st.success("Đăng ký thành công! Hãy quay lại tab Đăng nhập nhé.")
     
     st.stop() # Lệnh này chặn toàn bộ code bên dưới nếu chưa đăng nhập thành công
 # --- CẤU HÌNH DỮ LIỆU CÁ NHÂN ---
@@ -56,7 +56,7 @@ if not st.session_state.logged_in:
 DATA_FILE = f'data_{st.session_state.username}.json'
 
 # Thêm nút Đăng xuất ở thanh menu bên trái (Sidebar)
-st.sidebar.title(f"👋 Chào, {st.session_state.username}")
+st.sidebar.title(f"👋 Xin chào, {st.session_state.username}")
 if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.logged_in = False
     st.session_state.username = ''
@@ -147,11 +147,11 @@ with tab1:
 # --- TAB 2: GHI HÓA ĐƠN ---
 with tab2:
     if 'current_items' not in st.session_state: st.session_state.current_items = []
-    st.subheader("🤖 Nhập liệu nhanh AI")
+    st.subheader("🤖 Để AI nhập hộ bạn nhé")
     c_ai1, c_ai2 = st.columns(2)
     with c_ai1:
         up_f = st.file_uploader("📸 Quét ảnh bill", type=["jpg", "png", "jpeg"])
-        if up_f and st.button("✨ Phân tích ảnh"):
+        if up_f and st.button("✨ Ai đang căng mắt phân tích ảnh đây"):
             try:
                 img = PIL.Image.open(up_f); img.thumbnail((800, 800))
                 res = client.models.generate_content(model='gemini-2.5-flash', contents=["Đọc bill, trả về: TÊN|GIÁ|SL", img])
@@ -161,8 +161,8 @@ with tab2:
                 st.rerun()
             except Exception as e: st.error(e)
     with c_ai2:
-        txt_ai = st.text_area("💬 Dán tin nhắn:")
-        if txt_ai and st.button("✨ Phân tích chữ"):
+        txt_ai = st.text_area("💬 Dán tin nhắn ở đây nè:")
+        if txt_ai and st.button("✨ Ai đang đọc tin nhắn của bạn đây"):
             try:
                 res = client.models.generate_content(model='gemini-2.5-flash', contents=f"Phân tích bill: TÊN|GIÁ|SL: {txt_ai}")
                 for line in res.text.strip().split('\n'):
@@ -172,7 +172,7 @@ with tab2:
             except Exception as e: st.error(e)
 
     st.divider()
-    st.subheader("📝 Nhập món lẻ")
+    st.subheader("📝 Nhập món lẻ (tuỳ chọn nhá)")
     i_c1, i_c2, i_c3, i_c4 = st.columns([4, 3, 2, 2])
     im_n = i_c1.text_input("Tên món:")
     im_p = i_c2.text_input("Giá (VD: 50k, 200...):")
@@ -213,7 +213,7 @@ with tab2:
     b_cons = st.multiselect("Ai tham gia?", list(st.session_state.members.keys()), default=def_m)
 
     if total_bill == 0:
-        q_amt = st.text_input("💰 Nhập tổng bill nhanh:", value="0")
+        q_amt = st.text_input("💰 Nhập tổng bill nhanh ở đây:", value="0")
         total_bill = parse_amount(q_amt)
 
     if b_cons and total_bill > 0:
@@ -249,7 +249,7 @@ with tab3:
         st.success("Hết nợ! 🎉")
     else:
         st.subheader("⚙️ Tùy chọn chốt nợ")
-        use_netting = st.toggle("🔀 Tối ưu hóa nợ đa bên (Rút gọn số lần chuyển khoản tối đa)", value=False)
+        use_netting = st.toggle("🔀 Tối ưu hóa nợ cho mọi người (Để bạn không phải chuyển khoản nhiều nhé)", value=False)
         st.write("---")
 
         # 1. Tính toán Balance (Tổng tài sản ròng của mỗi người)
@@ -272,7 +272,7 @@ with tab3:
             # CHẾ ĐỘ 1: LIỆT KÊ TRỰC TIẾP (Theo từng chủ nợ)
             for debtor, bal in balances.items():
                 if bal < -1:
-                    with st.expander(f"🔴 **{debtor}** đang nợ tổng cộng: {format_vn(abs(bal))}đ"):
+                    with st.expander(f"🔴 **{debtor}** đang nợ tổng cộng, chờ xíu: {format_vn(abs(bal))}đ"):
                         my_debts = [d for d in details_for_everyone[debtor] if d['type'] == 'owe']
                         # Nhóm theo chủ nợ
                         by_creditor = {}
@@ -367,7 +367,7 @@ with tab5:
         # --- BỘ LỌC THỜI GIAN ---
         # Lấy mốc thời gian hiện tại là Tháng 4/2026
         time_filter = st.radio("⏳ Chọn mốc thời gian xem báo cáo:", 
-                               ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
+                               ["Tháng này(Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
         st.write("---")
         
         # Tách danh sách bill theo mốc thời gian đã chọn
