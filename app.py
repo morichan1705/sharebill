@@ -9,7 +9,60 @@ import PIL.Image
 
 # --- 1. CẤU HÌNH & LƯU TRỮ ---
 st.set_page_config(page_title="Share Bills Ultimate V6", page_icon="💸", layout="wide")
-DATA_FILE = 'data.json'
+# --- HỆ THỐNG ĐĂNG NHẬP (USER AUTHENTICATION) ---
+USERS_FILE = 'users.json'
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r', encoding='utf-8') as f: return json.load(f)
+    return {}
+
+def save_users(users_data):
+    with open(USERS_FILE, 'w', encoding='utf-8') as f: json.dump(users_data, f)
+
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = ''
+
+# GIAO DIỆN ĐĂNG NHẬP
+if not st.session_state.logged_in:
+    st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Sòng Phẳng</h1>", unsafe_allow_html=True)
+    tab_login, tab_reg = st.tabs(["Đăng nhập", "Đăng ký"])
+    users = load_users()
+    
+    with tab_login:
+        l_user = st.text_input("Tài khoản:")
+        l_pass = st.text_input("Mật khẩu:", type="password")
+        if st.button("🚀 Đăng nhập", type="primary", use_container_width=True):
+            if l_user in users and users[l_user] == l_pass:
+                st.session_state.logged_in = True
+                st.session_state.username = l_user
+                st.rerun()
+            else:
+                st.error("Sai tài khoản hoặc mật khẩu!")
+    
+    with tab_reg:
+        r_user = st.text_input("Tạo tài khoản mới:")
+        r_pass = st.text_input("Tạo mật khẩu:", type="password")
+        if st.button("📝 Đăng ký", use_container_width=True):
+            if r_user in users: st.error("Tài khoản đã tồn tại!")
+            elif r_user and r_pass:
+                users[r_user] = r_pass; save_users(users)
+                st.success("Đăng ký thành công! Hãy quay lại tab Đăng nhập.")
+    
+    st.stop() # Lệnh này chặn toàn bộ code bên dưới nếu chưa đăng nhập thành công
+# --- CẤU HÌNH DỮ LIỆU CÁ NHÂN ---
+# Mỗi user sẽ có một file data riêng (VD: data_lam.json)
+DATA_FILE = f'data_{st.session_state.username}.json'
+
+# Thêm nút Đăng xuất ở thanh menu bên trái (Sidebar)
+st.sidebar.title(f"👋 Chào, {st.session_state.username}")
+if st.sidebar.button("🚪 Đăng xuất"):
+    st.session_state.logged_in = False
+    st.session_state.username = ''
+    st.rerun()
+
+# ... (Từ đây trở xuống giữ nguyên cụm load_data(), save_data() và 4 Tab như cũ) ...
 
 API_KEY = st.secrets["GEMINI_API_KEY"]
 
@@ -52,7 +105,7 @@ def format_vn(num):
     return "{:,}".format(int(num))
 
 st.title("💸 Share Bills Ultimate V6")
-tab1, tab2, tab3, tab4 = st.tabs(["👥 Danh Bạ & Nhóm", "🧾 Ghi Hóa Đơn", "🔥 Chốt Sổ Nợ", "🕒 Nhật Ký Bill"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["👥 Danh Bạ & Nhóm", "🧾 Ghi Hóa Đơn", "🔥 Chốt Sổ Nợ", "🕒 Nhật Ký Bill", "🎁 Wrapped & Thống Kê"])
 
 # --- TAB 1: DANH BẠ & NHÓM ---
 with tab1:
@@ -128,11 +181,29 @@ with tab2:
         p = parse_amount(im_p)
         if im_n and p > 0: st.session_state.current_items.append({"name": im_n, "price": p, "qty": im_q}); st.rerun()
 
+    # --- THAY ĐOẠN CODE HIỂN THỊ MÓN ĂN CŨ BẰNG ĐOẠN NÀY ---
     total_bill = 0
-    for idx, it in enumerate(st.session_state.current_items):
-        total_bill += it['price'] * it['qty']
-        st.write(f"🔹 {it['name']} ({format_vn(it['price'])}đ x {it['qty']})")
-
+    if st.session_state.current_items:
+        st.write("---")
+        st.write("**📝 Danh sách món (Sửa trực tiếp hoặc Xóa):**")
+        for idx, it in enumerate(st.session_state.current_items):
+            col_n, col_p, col_q, col_del = st.columns([4, 3, 2, 1])
+            
+            # Các ô nhập liệu lấy giá trị mặc định từ AI, người dùng có thể gõ đè lên để sửa
+            new_name = col_n.text_input("Tên món", value=it['name'], key=f"edit_n_{idx}", label_visibility="collapsed")
+            new_price_str = col_p.text_input("Giá", value=str(it['price']), key=f"edit_p_{idx}", label_visibility="collapsed")
+            new_qty = col_q.number_input("SL", value=it['qty'], min_value=1, key=f"edit_q_{idx}", label_visibility="collapsed")
+            
+            # Tự động tính toán lại và lưu vào bộ nhớ khi bạn sửa
+            new_price = parse_amount(new_price_str)
+            st.session_state.current_items[idx] = {"name": new_name, "price": new_price, "qty": new_qty}
+            
+            total_bill += new_price * new_qty
+            
+            if col_del.button("❌", key=f"deli_{idx}"): 
+                st.session_state.current_items.pop(idx)
+                st.rerun()
+    # --------------------------------------------------------
     st.write("---")
     b_title = st.text_input("Tiêu đề bill:", value="Đi ăn")
     b_payer = st.selectbox("Ai trả tiền?", list(st.session_state.members.keys()))
@@ -168,7 +239,7 @@ with tab2:
         
         if st.button("💾 LƯU SỔ NỢ", type="primary"):
             now = datetime.now().strftime("%d/%m/%Y %H:%M")
-            st.session_state.history.append({"id": time.time(), "date": now, "name": b_title, "amount": total_bill, "payer": b_payer, "splits": splits, "status": "unpaid", "paid_by": []})
+            st.session_state.history.append({"id": time.time(), "date": now, "name": b_title, "amount": total_bill, "payer": b_payer, "splits": splits, "status": "unpaid", "paid_by": [], "items": st.session_state.current_items.copy()})
             st.session_state.current_items = []; save_data(); st.rerun()
 
 # --- TAB 3: CHỐT SỔ (Tối ưu hóa nợ đa bên) ---
@@ -285,3 +356,126 @@ with tab4:
                     status = "✅ Xong" if p in b.get('paid_by', []) or b['status'] == 'paid' else "🔴 Nợ"
                     if p == b['payer']: status = "👑 Chủ chi"
                     st.write(f"- {p}: {format_vn(amt)}đ ({status})")
+
+# --- TAB 5: WRAPPED & THỐNG KÊ (Theo mốc thời gian) ---
+with tab5:
+    st.markdown("<h2 style='text-align: center; color: #ff4b4b;'>🎉 Sòng Phẳng Wrapped</h2>", unsafe_allow_html=True)
+    
+    if not st.session_state.history:
+        st.info("Chưa có dữ liệu đi chơi. Hãy lập kèo đi ăn ngay để mở khóa thống kê!")
+    else:
+        # --- BỘ LỌC THỜI GIAN ---
+        # Lấy mốc thời gian hiện tại là Tháng 4/2026
+        time_filter = st.radio("⏳ Chọn mốc thời gian xem báo cáo:", 
+                               ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
+        st.write("---")
+        
+        # Tách danh sách bill theo mốc thời gian đã chọn
+        filtered_history = []
+        for b in st.session_state.history:
+            try:
+                # Chuyển đổi chuỗi ngày tháng (VD: "26/04/2026 19:30") thành object ngày
+                date_str = b['date'].split(" ")[0]
+                date_obj = datetime.strptime(date_str, "%d/%m/%Y")
+                
+                if time_filter == "Tháng này (Tháng 4)":
+                    if date_obj.month == 4 and date_obj.year == 2026:
+                        filtered_history.append(b)
+                elif time_filter == "Từ đầu năm (2026)":
+                    if date_obj.year == 2026:
+                        filtered_history.append(b)
+            except: 
+                pass # Bỏ qua nếu ngày tháng bị nhập sai định dạng
+                
+        # Nếu khoảng thời gian được chọn không có dữ liệu
+        if not filtered_history:
+            st.warning(f"Chưa có kèo nào được ghi nhận trong mốc: **{time_filter.split(' (')[0]}**")
+        else:
+            # --- 1. TÍNH TOÁN DỮ LIỆU TỔNG QUAN (Chỉ tính trên filtered_history) ---
+            total_spent = sum(b['amount'] for b in filtered_history)
+            payer_stats = {}
+            debt_stats = {}
+            tra_sua_count = 0
+            group_dates = {} 
+            
+            for b in filtered_history:
+                p = b['payer']
+                payer_stats[p] = payer_stats.get(p, 0) + b['amount']
+                
+                if b['status'] == 'unpaid':
+                    for debtor, amt in b['splits'].items():
+                        if debtor != p and amt > 0 and debtor not in b.get('paid_by', []):
+                            debt_stats[debtor] = debt_stats.get(debtor, 0) + amt
+                
+                for it in b.get('items', []):
+                    if any(keyword in it['name'].lower() for keyword in ["trà sữa", "ts", "cafe", "nước", "phúc long", "koi"]):
+                        tra_sua_count += it['qty']
+                        
+                matched_group_name = None
+                for gn, members in st.session_state.groups.items():
+                    if set(b['splits'].keys()) == set(members):
+                        matched_group_name = gn; break
+                
+                group_key = matched_group_name if matched_group_name else "Kèo: " + ", ".join(sorted(b['splits'].keys()))
+                if group_key not in group_dates: group_dates[group_key] = []
+                
+                try:
+                    date_str = b['date'].split(" ")[0]
+                    group_dates[group_key].append(datetime.strptime(date_str, "%d/%m/%Y").date())
+                except: pass
+                
+            # --- 2. TÌM DANH HIỆU ---
+            dai_gia = max(payer_stats, key=payer_stats.get) if payer_stats else "Chưa có"
+            chua_no = max(debt_stats, key=debt_stats.get) if debt_stats else "Trắng nợ"
+            
+            # --- 3. TÍNH STREAK ---
+            group_streaks = {}
+            for g_name, dates_list in group_dates.items():
+                dates_list = sorted(list(set(dates_list)))
+                streak = 0
+                if dates_list:
+                    streak = 1
+                    for i in range(1, len(dates_list)):
+                        if (dates_list[i] - dates_list[i-1]).days <= 7: streak += 1
+                        else: streak = 1 
+                group_streaks[g_name] = streak
+                
+            champion_group = max(group_streaks, key=group_streaks.get) if group_streaks else "Chưa có"
+            champion_streak = group_streaks.get(champion_group, 0)
+
+            # --- 4. GIAO DIỆN WRAPPED ---
+            st.subheader(f"🏆 Bảng Phong Thần - {time_filter.split(' (')[0]}")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>"
+                            f"<h3>👑 Đại Gia Quẹt Thẻ</h3><h2 style='color:#ff4b4b;'>{dai_gia}</h2>"
+                            f"<p>Tổng ứng: {format_vn(payer_stats.get(dai_gia, 0))}đ</p></div>", unsafe_allow_html=True)
+            with col2:
+                st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>"
+                            f"<h3>🐢 Chúa Tể Nợ Nần</h3><h2 style='color:#ff4b4b;'>{chua_no}</h2>"
+                            f"<p>Đang nợ: {format_vn(debt_stats.get(chua_no, 0))}đ</p></div>", unsafe_allow_html=True)
+            with col3:
+                st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>"
+                            f"<h3>💸 Tổng Đốt Tiền</h3><h2 style='color:#ff4b4b;'>{format_vn(total_spent)}đ</h2>"
+                            f"<p>Qua {len(filtered_history)} kèo</p></div>", unsafe_allow_html=True)
+
+            st.write("---")
+            
+            # --- 5. THỐNG KÊ VUI ---
+            if tra_sua_count > 0:
+                st.success(f"🧋 **Báo động đường huyết:** Trong {time_filter.split(' (')[0].lower()}, nhóm đã tiêu thụ **{tra_sua_count} ly đồ uống**!")
+                
+            # --- 6. CHUỖI VÀ BẢNG XẾP HẠNG ---
+            st.subheader("🔥 Cuộc Đua Chuỗi Đi Chơi (Streak)")
+            if champion_streak > 0:
+                st.markdown(f"🥇 **Hội Quẩy Nhiệt Nhất:** Nhóm `{champion_group}` đang dẫn đầu với **{champion_streak} kèo liên tiếp**! 🔥")
+            
+            with st.expander("Bảng xếp hạng Streak các nhóm"):
+                for g, s in sorted(group_streaks.items(), key=lambda item: item[1], reverse=True):
+                    icon = "🔥" if s >= 3 else "🌱"
+                    st.write(f"{icon} **{g}**: {s} kèo liên tiếp")
+                    
+            st.write("---")
+            st.subheader("📊 Tỉ trọng người thanh toán (Biểu đồ)")
+            if payer_stats:
+                st.bar_chart(payer_stats)
