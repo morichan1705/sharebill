@@ -236,114 +236,202 @@ with tab2:
         st.markdown("### 👀 Xem trước (Preview)")
         for c, amt in splits.items():
             if amt > 0: st.write(f"- {c}: **{format_vn(amt)}đ**")
+
+        # --- THÊM TÙY CHỌN DEADLINE (MẶC ĐỊNH LÀ KHÔNG CÓ) ---
+    has_deadline = st.checkbox("📅 Đặt hạn chót thanh toán cho bill này?")
+    b_deadline = None
+    if has_deadline:
+        b_deadline = st.date_input("Chọn ngày hạn chót:", value=datetime.now().date()).strftime("%d/%m/%Y")
+
+    if b_cons and total_bill > 0:
+        # ... (giữ nguyên logic method và preview) ...
         
+        if st.button("💾 LƯU SỔ NỢ", type="primary"):
+            now = datetime.now().strftime("%d/%m/%Y %H:%M")
+            st.session_state.history.append({
+                "id": time.time(), 
+                "date": now, 
+                "deadline": b_deadline, # Lưu giá trị (None hoặc chuỗi ngày)
+                "name": b_title, 
+                "amount": total_bill, 
+                "payer": b_payer, 
+                "splits": splits, 
+                "status": "unpaid", 
+                "paid_by": []
+            })
+            st.session_state.current_items = []; save_data(); st.rerun()
         if st.button("💾 LƯU SỔ NỢ", type="primary"):
             now = datetime.now().strftime("%d/%m/%Y %H:%M")
             st.session_state.history.append({"id": time.time(), "date": now, "name": b_title, "amount": total_bill, "payer": b_payer, "splits": splits, "status": "unpaid", "paid_by": [], "items": st.session_state.current_items.copy()})
             st.session_state.current_items = []; save_data(); st.rerun()
 
-# --- TAB 3: CHỐT SỔ (Tối ưu hóa nợ đa bên) ---
+# --- TAB 3: CHỐT SỔ (Bù trừ nợ chéo & Có Deadline) ---
 with tab3:
     unpaid = [b for b in st.session_state.history if b['status'] == 'unpaid']
     if not unpaid:
-        st.success("Hết nợ! 🎉")
+        st.success("Tất cả hóa đơn đã thanh toán xong! 🎉")
     else:
         st.subheader("⚙️ Tùy chọn chốt nợ")
-        use_netting = st.toggle("🔀 Tối ưu hóa nợ cho mọi người (Để bạn không phải chuyển khoản nhiều nhé)", value=False)
+        use_netting = st.toggle("🔀 Bật tính nhanh nợ chéo (Bù trừ nợ qua lại)", value=False)
         st.write("---")
 
-        # 1. Tính toán Balance (Tổng tài sản ròng của mỗi người)
-        # Ai có Balance dương là người cần thu tiền, âm là người cần trả tiền
-        balances = {m: 0 for m in st.session_state.members}
-        details_for_everyone = {m: [] for m in st.session_state.members}
-
-        for b in unpaid:
-            creditor = b['payer']
-            paid_by = b.get('paid_by', [])
-            balances[creditor] += (b['amount'] - b['splits'].get(creditor, 0))
-            
-            for debtor, amt in b['splits'].items():
-                if debtor != creditor and amt > 0 and debtor not in paid_by:
-                    balances[debtor] -= amt
-                    details_for_everyone[debtor].append({"date": b['date'], "name": b['name'], "amount": amt, "type": "owe", "to": creditor})
-                    details_for_everyone[creditor].append({"date": b['date'], "name": b['name'], "amount": amt, "type": "collect", "from": debtor})
-
         if not use_netting:
-            # CHẾ ĐỘ 1: LIỆT KÊ TRỰC TIẾP (Theo từng chủ nợ)
-            for debtor, bal in balances.items():
-                if bal < -1:
-                    with st.expander(f"🔴 **{debtor}** đang nợ tổng cộng, chờ xíu: {format_vn(abs(bal))}đ"):
-                        my_debts = [d for d in details_for_everyone[debtor] if d['type'] == 'owe']
-                        # Nhóm theo chủ nợ
-                        by_creditor = {}
-                        for d in my_debts:
-                            if d['to'] not in by_creditor: by_creditor[d['to']] = 0
-                            by_creditor[d['to']] += d['amount']
+            # CHẾ ĐỘ 1: LIỆT KÊ CHI TIẾT THEO TỪNG KHOẢN
+            st.markdown("### 📜 Danh sách nợ chi tiết")
+            debts_dict = {}
+            for b in unpaid:
+                creditor = b['payer']
+                paid_by_list = b.get('paid_by', [])
+                for debtor, amt in b['splits'].items():
+                    if debtor != creditor and amt > 0 and debtor not in paid_by_list:
+                        pair = (debtor, creditor)
+                        if pair not in debts_dict: debts_dict[pair] = []
+                        # Lấy thêm trường deadline từ bill gốc
+                        debts_dict[pair].append({"date": b['date'], "name": b['name'], "amount": amt, "deadline": b.get('deadline')})
+
+            for (debtor, creditor), items in debts_dict.items():
+                total_owed = sum(item['amount'] for item in items)
+                with st.expander(f"🔴 **{debtor}** nợ **{creditor}**: {format_vn(total_owed)}đ"):
+                    for item in items:
+                        st.write(f"- Ngày {item['date']} | {item['name']} | **{format_vn(item['amount'])}đ**")
                         
-                        for cred, total in by_creditor.items():
-                            st.write(f"👉 **Nợ {cred}: {format_vn(total)}đ**")
-                            c_info = st.session_state.members[cred]
-                            if c_info['bank'] and c_info['acc']:
-                                qr = f"https://img.vietqr.io/image/{c_info['bank']}-{c_info['acc']}-compact2.png?amount={int(total)}&addInfo={debtor}chuyen"
-                                st.image(qr, width=200)
-                            if st.button(f"Xác nhận đã trả xong cho {cred}", key=f"pay_{debtor}_{cred}"):
-                                for b in st.session_state.history:
-                                    if b['status'] == 'unpaid' and b['payer'] == cred and debtor in b['splits']:
-                                        if 'paid_by' not in b: b['paid_by'] = []
-                                        if debtor not in b['paid_by']: b['paid_by'].append(debtor)
-                                        if all(d in b['paid_by'] or d == b['payer'] or b['splits'][d] <= 0 for d in b['splits']):
-                                            b['status'] = 'paid'
-                                save_data(); st.rerun()
-        else:
-            # CHẾ ĐỘ 2: TỐI ƯU HÓA (NETTING ĐA BÊN)
-            st.markdown("### 🔀 Kết quả rút gọn nợ toàn nhóm")
-            st.caption("Lâm nợ Thắng, Hân nợ Lâm -> Tính toán Hân trả thẳng cho Thắng để bớt khâu trung gian.")
-            
-            # Tách thành 2 nhóm: Người phải trả (âm) và Người được nhận (dương)
-            debtors = [[m, abs(bal)] for m, bal in balances.items() if bal < -1]
-            creditors = [[m, bal] for m, bal in balances.items() if bal > 1]
-
-            # Thuật toán Greedy tối ưu hóa số lần chuyển
-            transactions = []
-            while debtors and creditors:
-                debtors.sort(key=lambda x: x[1], reverse=True)
-                creditors.sort(key=lambda x: x[1], reverse=True)
-                
-                d_name, d_amt = debtors[0]
-                c_name, c_amt = creditors[0]
-                
-                settle_amt = min(d_amt, c_amt)
-                transactions.append({"from": d_name, "to": c_name, "amount": settle_amt})
-                
-                debtors[0][1] -= settle_amt
-                creditors[0][1] -= settle_amt
-                
-                if debtors[0][1] < 1: debtors.pop(0)
-                if creditors[0][1] < 1: creditors.pop(0)
-
-            for tx in transactions:
-                with st.expander(f"✨ **{tx['from']}** ➡️ **{tx['to']}**: {format_vn(tx['amount'])}đ"):
-                    st.write(f"Số tiền này bao gồm các khoản bù trừ từ nhiều hóa đơn khác nhau.")
-                    c_info = st.session_state.members[tx['to']]
-                    if c_info['bank'] and c_info['acc']:
-                        qr = f"https://img.vietqr.io/image/{c_info['bank']}-{c_info['acc']}-compact2.png?amount={int(tx['amount'])}&addInfo={tx['from']}chuyen"
-                        st.image(qr, width=200)
+                        # ---> PHẦN HIỂN THỊ CẢNH BÁO DEADLINE NẰM Ở ĐÂY <---
+                        if item.get('deadline'): 
+                            today = datetime.now().date()
+                            dl_date = datetime.strptime(item['deadline'], "%d/%m/%Y").date()
+                            
+                            if today > dl_date:
+                                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;⚠️ <span style='color:red; font-weight:bold;'>QUÁ HẠN (Hạn chót: {item['deadline']})</span>", unsafe_allow_html=True)
+                            else:
+                                st.caption(f"&nbsp;&nbsp;&nbsp;&nbsp;⏰ Hạn chót: {item['deadline']}")
                     
-                    if st.button(f"Xác nhận đã trả xong", key=f"net_{tx['from']}_{tx['to']}"):
-                        # Lưu ý: Với Netting đa bên, việc xác nhận một giao dịch sẽ dọn sạch
-                        # một phần nợ của người đó trong các bill liên quan.
-                        # Để đơn giản và an toàn, ta sẽ xử lý dứt điểm nợ của 'from' 
-                        # đối với bất kỳ ai, và 'to' được nhận tiền từ bất kỳ ai.
-                        # (Đây là logic 'Chốt sổ dứt điểm' cho giao dịch tối ưu)
-                        remaining = tx['amount']
+                    st.write("---")
+                    c_info = st.session_state.members[creditor]
+                    if c_info['bank'] and c_info['acc']:
+                        qr_url = f"https://img.vietqr.io/image/{c_info['bank']}-{c_info['acc']}-compact2.png?amount={int(total_owed)}&addInfo={debtor}chuyentien"
+                        st.image(qr_url, caption="QR Chuyển khoản", width=250)
+                    
+                    if st.button(f"✅ Xác nhận {debtor} đã trả xong cho {creditor}", key=f"pay_{debtor}_{creditor}"):
                         for b in st.session_state.history:
-                            if b['status'] == 'unpaid' and remaining > 0:
-                                if tx['from'] in b['splits'] and tx['from'] not in b.get('paid_by', []):
-                                    b.setdefault('paid_by', []).append(tx['from'])
-                                    # Kiểm tra đóng bill
-                                    if all(d in b['paid_by'] or d == b['payer'] or b['splits'][d] <= 0 for d in b['splits']):
-                                        b['status'] = 'paid'
+                            if b['status'] == 'unpaid' and b['payer'] == creditor and debtor in b['splits']:
+                                if 'paid_by' not in b: b['paid_by'] = []
+                                if debtor not in b['paid_by']: b['paid_by'].append(debtor)
+                                
+                                all_paid = True
+                                for d, a in b['splits'].items():
+                                    if d != creditor and a > 0 and d not in b['paid_by']: all_paid = False
+                                if all_paid: b['status'] = 'paid'
                         save_data(); st.rerun()
+
+        else:
+            # CHẾ ĐỘ 2: TÍNH NHANH NỢ CHÉO (BÙ TRỪ)
+            st.markdown("### 🔀 Kết quả bù trừ nợ chéo")
+            matrix = {m1: {m2: 0 for m2 in st.session_state.members} for m1 in st.session_state.members}
+            details = {m1: {m2: [] for m2 in st.session_state.members} for m1 in st.session_state.members}
+
+            for b in unpaid:
+                creditor = b['payer']
+                paid_by = b.get('paid_by', [])
+                for debtor, amt in b['splits'].items():
+                    if debtor != creditor and amt > 0 and debtor not in paid_by:
+                        matrix[debtor][creditor] += amt
+                        # Lấy thêm trường deadline
+                        details[debtor][creditor].append({"date": b['date'], "name": b['name'], "amount": amt, "deadline": b.get('deadline')})
+
+            all_members = list(st.session_state.members.keys())
+            found_netting = False
+            for i in range(len(all_members)):
+                for j in range(i + 1, len(all_members)):
+                    m1, m2 = all_members[i], all_members[j]
+                    if matrix[m1][m2] > matrix[m2][m1]:
+                        net_amt = matrix[m1][m2] - matrix[m2][m1]
+                        if net_amt > 1:
+                            found_netting = True
+                            with st.expander(f"👉 **{m1}** cần chuyển **{m2}**: {format_vn(net_amt)}đ (Đã bù trừ)"):
+                                st.write(f"**{m1} nợ {m2} tổng {format_vn(matrix[m1][m2])}đ từ:**")
+                                for p in details[m1][m2]: 
+                                    st.write(f"- (+) {p['name']} ({format_vn(p['amount'])}đ)")
+                                    # ---> DEADLINE CHO MỤC CẦN TRẢ <---
+                                    if p.get('deadline'):
+                                        today = datetime.now().date()
+                                        dl_date = datetime.strptime(p['deadline'], "%d/%m/%Y").date()
+                                        if today > dl_date:
+                                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;⚠️ <span style='color:red; font-weight:bold;'>QUÁ HẠN (Hạn chót: {p['deadline']})</span>", unsafe_allow_html=True)
+                                        else:
+                                            st.caption(f"&nbsp;&nbsp;&nbsp;&nbsp;⏰ Hạn chót: {p['deadline']}")
+
+                                if matrix[m2][m1] > 0:
+                                    st.write(f"**Được trừ {format_vn(matrix[m2][m1])}đ do {m2} nợ lại {m1} từ:**")
+                                    for n in details[m2][m1]: 
+                                        st.write(f"- (-) {n['name']} ({format_vn(n['amount'])}đ)")
+                                
+                                st.write("---")
+                                c_info = st.session_state.members[m2]
+                                if c_info['bank'] and c_info['acc']:
+                                    qr = f"https://img.vietqr.io/image/{c_info['bank']}-{c_info['acc']}-compact2.png?amount={int(net_amt)}&addInfo={m1}chuyen"
+                                    st.image(qr, width=250)
+                                
+                                if st.button(f"✅ Xác nhận {m1} đã chuyển khoản (Bù trừ)", key=f"net_{m1}_{m2}"):
+                                    for b in st.session_state.history:
+                                        if b['status'] == 'unpaid':
+                                            if b['payer'] == m2 and m1 in b['splits']:
+                                                if 'paid_by' not in b: b['paid_by'] = []
+                                                if m1 not in b['paid_by']: b['paid_by'].append(m1)
+                                            if b['payer'] == m1 and m2 in b['splits']:
+                                                if 'paid_by' not in b: b['paid_by'] = []
+                                                if m2 not in b['paid_by']: b['paid_by'].append(m2)
+                                            
+                                            all_p = True
+                                            for d, a in b['splits'].items():
+                                                if d != b['payer'] and a > 0 and d not in b.get('paid_by', []): all_p = False
+                                            if all_p: b['status'] = 'paid'
+                                    save_data(); st.rerun()
+                    
+                    elif matrix[m2][m1] > matrix[m1][m2]:
+                        net_amt = matrix[m2][m1] - matrix[m1][m2]
+                        if net_amt > 1:
+                            found_netting = True
+                            with st.expander(f"👉 **{m2}** cần chuyển **{m1}**: {format_vn(net_amt)}đ (Đã bù trừ)"):
+                                st.write(f"**{m2} nợ {m1} tổng {format_vn(matrix[m2][m1])}đ từ:**")
+                                for p in details[m2][m1]: 
+                                    st.write(f"- (+) {p['name']} ({format_vn(p['amount'])}đ)")
+                                    # ---> DEADLINE CHO MỤC CẦN TRẢ <---
+                                    if p.get('deadline'):
+                                        today = datetime.now().date()
+                                        dl_date = datetime.strptime(p['deadline'], "%d/%m/%Y").date()
+                                        if today > dl_date:
+                                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;⚠️ <span style='color:red; font-weight:bold;'>QUÁ HẠN (Hạn chót: {p['deadline']})</span>", unsafe_allow_html=True)
+                                        else:
+                                            st.caption(f"&nbsp;&nbsp;&nbsp;&nbsp;⏰ Hạn chót: {p['deadline']}")
+
+                                if matrix[m1][m2] > 0:
+                                    st.write(f"**Được trừ {format_vn(matrix[m1][m2])}đ do {m1} nợ lại {m2} từ:**")
+                                    for n in details[m1][m2]: st.write(f"- (-) {n['name']} ({format_vn(n['amount'])}đ)")
+                                
+                                st.write("---")
+                                c_info = st.session_state.members[m1]
+                                if c_info['bank'] and c_info['acc']:
+                                    qr = f"https://img.vietqr.io/image/{c_info['bank']}-{c_info['acc']}-compact2.png?amount={int(net_amt)}&addInfo={m2}chuyen"
+                                    st.image(qr, width=250)
+                                
+                                if st.button(f"✅ Xác nhận {m2} đã chuyển khoản (Bù trừ)", key=f"net_{m2}_{m1}"):
+                                    for b in st.session_state.history:
+                                        if b['status'] == 'unpaid':
+                                            if b['payer'] == m1 and m2 in b['splits']:
+                                                if 'paid_by' not in b: b['paid_by'] = []
+                                                if m2 not in b['paid_by']: b['paid_by'].append(m2)
+                                            if b['payer'] == m2 and m1 in b['splits']:
+                                                if 'paid_by' not in b: b['paid_by'] = []
+                                                if m1 not in b['paid_by']: b['paid_by'].append(m1)
+                                            
+                                            all_p = True
+                                            for d, a in b['splits'].items():
+                                                if d != b['payer'] and a > 0 and d not in b.get('paid_by', []): all_p = False
+                                            if all_p: b['status'] = 'paid'
+                                    save_data(); st.rerun()
+
+            if not found_netting:
+                st.info("Hiện không có cặp nào có thể bù trừ nợ cho nhau.")
 
 # --- TAB 4: NHẬT KÝ ---
 with tab4:
