@@ -227,7 +227,7 @@ with tab2:
     c_info1, c_info2 = st.columns(2)
     b_title = c_info1.text_input("Tiêu đề bill:", value="Đi ăn")
     # Hiển thị ngày giờ AI quét được, hoặc ngày giờ hiện tại nếu AI không tìm thấy
-    b_date = c_info2.text_input("Thời gian (AI tự điền):", value=st.session_state.ai_date)
+    b_date = c_info2.text_input("Thời gian (AI tự điền):", value=st.session_state.get("ai_date", datetime.now().strftime("%d/%m/%Y %H:%M")))
     b_payer = st.selectbox("Ai trả tiền?", list(st.session_state.members.keys()))
     use_g = st.selectbox("Chọn nhóm (để tick nhanh):", ["-- Chọn lẻ --"] + list(st.session_state.groups.keys()))
     def_m = list(st.session_state.members.keys())
