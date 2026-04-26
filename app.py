@@ -7,56 +7,17 @@ from datetime import datetime
 from google import genai
 import PIL.Image
 
-# --- 1. CẤU HÌNH & LƯU TRỮ ---
-st.set_page_config(page_title="Share Bills Ultimate V6", page_icon="💸", layout="wide")
-# --- TÙY CHỈNH CSS NÂNG CAO ---
-st.markdown("""
-    <style>
-    /* 1. Bo tròn và tạo hiệu ứng nổi cho tất cả các nút bấm */
-    div.stButton > button {
-        border-radius: 25px;
-        transition: all 0.3s ease;
-        border: none;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    /* Hiệu ứng khi di chuột vào nút */
-    div.stButton > button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 5px 15px rgba(255, 75, 75, 0.4);
-    }
-    
-    /* 2. Làm đẹp thanh Tab Menu trên cùng */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 10px 10px 0 0;
-        padding: 10px 15px;
-    }
-    
-    /* 3. Ẩn chữ "Made with Streamlit" ở dưới cùng cho chuyên nghiệp */
-    footer {visibility: hidden;}
-    
-    /* 4. Làm đẹp các ô Expander (Thẻ thả xuống) */
-    [data-testid="stExpander"] {
-        border: 1px solid #ffeaeb;
-        border-radius: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
-    }
-    </style>
-""", unsafe_allow_html=True)
-   # --- 2. SỬA LẠI LOGIC ĐĂNG NHẬP ---
-# (Trong phần Tab Đăng nhập, chỗ kiểm tra mật khẩu)
-if l_user in users:
-    user_data = users[l_user]
-    # Kiểm tra cả kiểu cũ (chuỗi) và kiểu mới (dict) để tránh lỗi dữ liệu cũ
-    stored_pass = user_data["pass"] if isinstance(user_data, dict) else user_data
-    if l_pass == stored_pass:
-        st.session_state.logged_in = True
-        st.session_state.username = l_user
-        st.session_state.nickname = user_data.get("nickname", l_user) if isinstance(user_data, dict) else l_user
-        st.rerun()
-# --- HỆ THỐNG ĐĂNG NHẬP (USER AUTHENTICATION) ---
+# --- 1. CÀI ĐẶT TRANG CƠ BẢN ---
+st.set_page_config(page_title="Sòng Phẳng Super Ultimate", page_icon="💸", layout="wide")
+
+# Lấy Key từ Secrets
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    client = genai.Client(api_key=API_KEY)
+except Exception as e:
+    client = None
+
+# --- 2. HỆ THỐNG ĐĂNG NHẬP / ĐĂNG KÝ ---
 USERS_FILE = 'users.json'
 
 def load_users():
@@ -67,51 +28,62 @@ def load_users():
 def save_users(users_data):
     with open(USERS_FILE, 'w', encoding='utf-8') as f: json.dump(users_data, f)
 
+# Khởi tạo biến users ở NGOÀI CÙNG để không bao giờ bị lỗi NameError
+users = load_users()
+
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ''
+    st.session_state.nickname = ''
 
-# GIAO DIỆN ĐĂNG NHẬP
+# GIAO DIỆN ĐĂNG NHẬP (Chỉ hiện khi chưa login)
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Share Bills</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Sòng Phẳng</h1>", unsafe_allow_html=True)
     tab_login, tab_reg = st.tabs(["Đăng nhập", "Đăng ký"])
-    users = load_users()
     
     with tab_login:
-        l_user = st.text_input("Tên bạn là gì:")
+        l_user = st.text_input("Tài khoản:")
         l_pass = st.text_input("Mật khẩu:", type="password")
         if st.button("🚀 Đăng nhập", type="primary", use_container_width=True):
-            if l_user in users and users[l_user] == l_pass:
-                st.session_state.logged_in = True
-                st.session_state.username = l_user
-                st.rerun()
+            if l_user in users:
+                user_data = users[l_user]
+                stored_pass = user_data["pass"] if isinstance(user_data, dict) else user_data
+                if l_pass == stored_pass:
+                    st.session_state.logged_in = True
+                    st.session_state.username = l_user
+                    st.session_state.nickname = user_data.get("nickname", l_user) if isinstance(user_data, dict) else l_user
+                    st.rerun()
+                else:
+                    st.error("Sai mật khẩu!")
             else:
-                st.error("Sai òi!")
-    
+                st.error("Tài khoản không tồn tại!")
+                
     with tab_reg:
         r_user = st.text_input("Tên đăng nhập (ID):", key="reg_id")
         r_pass = st.text_input("Mật khẩu:", type="password", key="reg_pass")
-        r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Trúc Lâm)", key="reg_nick") # Ô mới theo yêu cầu
+        r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Trúc Lâm)", key="reg_nick")
         
         if st.button("📝 Đăng ký tài khoản", use_container_width=True):
-            if r_user in users: st.error("ID này đã tồn tại!")
+            if r_user in users: 
+                st.error("ID này đã tồn tại!")
             elif r_user and r_pass and r_nick:
-                # Lưu cấu trúc mới: ID -> {mật khẩu, nickname}
                 users[r_user] = {"pass": r_pass, "nickname": r_nick}
                 save_users(users)
                 st.success("Đăng ký thành công! Mời bạn qua tab Đăng nhập.")
-            else: st.warning("Vui lòng điền đủ thông tin!")
- 
-    st.stop() # Lệnh này chặn toàn bộ code bên dưới nếu chưa đăng nhập thành công
-# --- CẤU HÌNH DỮ LIỆU CÁ NHÂN ---
-# Mỗi user sẽ có một file data riêng (VD: data_lam.json)
+            else: 
+                st.warning("Vui lòng điền đủ 3 thông tin!")
+                
+    st.stop() # <--- CỰC KỲ QUAN TRỌNG: Chặn không cho web chạy tiếp nếu chưa login
+
+# --- 3. CHUẨN BỊ DỮ LIỆU & GIAO DIỆN CHÍNH (Chạy sau khi đã login) ---
 DATA_FILE = f'data_{st.session_state.username}.json'
 
-# Thêm nút Đăng xuất ở thanh menu bên trái (Sidebar)
+# Sidebar - Hiển thị Nickname
 st.sidebar.markdown(f"### ✨ Xin chào, **{st.session_state.get('nickname', 'Bạn')}**!")
 if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.logged_in = False
     st.session_state.username = ''
+    st.session_state.nickname = ''
     st.rerun()
 
 # ... (Từ đây trở xuống giữ nguyên cụm load_data(), save_data() và 4 Tab như cũ) ...
