@@ -8,7 +8,7 @@ from google import genai
 import PIL.Image
 
 # --- 1. CÀI ĐẶT TRANG CƠ BẢN ---
-st.set_page_config(page_title="Sòng Phẳng Super Ultimate", page_icon="💸", layout="wide")
+st.set_page_config(page_title="Share Bills Super Ultimate", page_icon="💸", layout="wide")
 
 # Lấy Key từ Secrets
 try:
@@ -38,7 +38,7 @@ if 'logged_in' not in st.session_state:
 
 # GIAO DIỆN ĐĂNG NHẬP (Chỉ hiện khi chưa login)
 if not st.session_state.logged_in:
-    st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Sòng Phẳng</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Share Bills</h1>", unsafe_allow_html=True)
     tab_login, tab_reg = st.tabs(["Đăng nhập", "Đăng ký"])
     
     with tab_login:
@@ -522,7 +522,7 @@ with tab3:
                     if debtors[0][1] < 1: debtors.pop(0)
                     if creditors[0][1] < 1: creditors.pop(0)
                 
-        msg += "\n(Mọi người vào web check bill chi tiết và lấy mã VietQR nha 💸)"
+        msg += "\n(Mọi người vào web check bill chi tiết và chuyển khoản nha💸)"
         
         with st.expander("📋 Lấy tin nhắn gửi nhóm (Copy nhanh)"):
             st.code(msg, language="text")
@@ -706,7 +706,7 @@ with tab4:
 # --- TAB 5: WRAPPED & ANALYTICS (Dashboard Cá nhân & Nhóm) ---
 with tab5:
     my_nick = st.session_state.get('nickname', 'Bạn')
-    st.markdown(f"<h2 style='text-align: center; color: #ff4b4b;'>🎉 Sòng Phẳng Wrapped - {my_nick}</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align: center; color: #ff4b4b;'>🎉 Share Bills Wrapped - {my_nick}</h2>", unsafe_allow_html=True)
     
     if not st.session_state.history:
         st.info("Chưa có dữ liệu. Hãy ghi bill để mở khóa báo cáo!")
