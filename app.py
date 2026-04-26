@@ -45,6 +45,17 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+   # --- 2. SỬA LẠI LOGIC ĐĂNG NHẬP ---
+# (Trong phần Tab Đăng nhập, chỗ kiểm tra mật khẩu)
+if l_user in users:
+    user_data = users[l_user]
+    # Kiểm tra cả kiểu cũ (chuỗi) và kiểu mới (dict) để tránh lỗi dữ liệu cũ
+    stored_pass = user_data["pass"] if isinstance(user_data, dict) else user_data
+    if l_pass == stored_pass:
+        st.session_state.logged_in = True
+        st.session_state.username = l_user
+        st.session_state.nickname = user_data.get("nickname", l_user) if isinstance(user_data, dict) else l_user
+        st.rerun()
 # --- HỆ THỐNG ĐĂNG NHẬP (USER AUTHENTICATION) ---
 USERS_FILE = 'users.json'
 
@@ -77,22 +88,27 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai òi!")
     
-    with tab_reg:
-        r_user = st.text_input("Tạo tài khoản mới:")
-        r_pass = st.text_input("Tạo mật khẩu:", type="password")
-        if st.button("📝 Đăng ký", use_container_width=True):
-            if r_user in users: st.error("Bạn đã có tài khoản rồi!")
-            elif r_user and r_pass:
-                users[r_user] = r_pass; save_users(users)
-                st.success("Đăng ký thành công! Hãy quay lại tab Đăng nhập nhé.")
-    
+  with tab_reg:
+        r_user = st.text_input("Tên đăng nhập (ID):", key="reg_id")
+        r_pass = st.text_input("Mật khẩu:", type="password", key="reg_pass")
+        r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Trúc Lâm)", key="reg_nick") # Ô mới theo yêu cầu
+        
+        if st.button("📝 Đăng ký tài khoản", use_container_width=True):
+            if r_user in users: st.error("ID này đã tồn tại!")
+            elif r_user and r_pass and r_nick:
+                # Lưu cấu trúc mới: ID -> {mật khẩu, nickname}
+                users[r_user] = {"pass": r_pass, "nickname": r_nick}
+                save_users(users)
+                st.success("Đăng ký thành công! Mời bạn qua tab Đăng nhập.")
+            else: st.warning("Vui lòng điền đủ thông tin!")
+ 
     st.stop() # Lệnh này chặn toàn bộ code bên dưới nếu chưa đăng nhập thành công
 # --- CẤU HÌNH DỮ LIỆU CÁ NHÂN ---
 # Mỗi user sẽ có một file data riêng (VD: data_lam.json)
 DATA_FILE = f'data_{st.session_state.username}.json'
 
 # Thêm nút Đăng xuất ở thanh menu bên trái (Sidebar)
-st.sidebar.title(f"👋 Xin chào, {st.session_state.username}")
+st.sidebar.markdown(f"### ✨ Xin chào, **{st.session_state.get('nickname', 'Bạn')}**!")
 if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.logged_in = False
     st.session_state.username = ''
@@ -106,7 +122,7 @@ try:
     client = genai.Client(api_key=API_KEY)
 except:
     client = None
-
+    
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r', encoding='utf-8') as f:
@@ -145,6 +161,24 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["👥 Danh Bạ & Nhóm", "🧾 Ghi Hóa
 
 # --- TAB 1: DANH BẠ & NHÓM ---
 with tab1:
+    my_nick = st.session_state.get('nickname', 'Bản thân')
+    st.markdown(f"### 👤 Thông tin cá nhân ({my_nick})")
+    
+    # Đảm bảo có entry cho bản thân trong members
+    if my_nick not in st.session_state.members:
+        st.session_state.members[my_nick] = {"bank": "", "acc": ""}
+
+    with st.expander("💳 Cài đặt tài khoản ngân hàng của bạn (Để người khác quét mã)"):
+        c1, c2 = st.columns(2)
+        my_bank = c1.text_input("Ngân hàng:", value=st.session_state.members[my_nick]['bank'])
+        my_acc = c2.text_input("Số tài khoản:", value=st.session_state.members[my_nick]['acc'])
+        if st.button("Cập nhật thông tin cá nhân"):
+            st.session_state.members[my_nick] = {"bank": my_bank, "acc": my_acc}
+            save_data(); st.toast("Đã lưu thông tin cá nhân!"); st.rerun()
+    
+    st.write("---")
+    st.markdown("### 👥 Quản lý Bạn bè & Nhóm")
+    # (Các phần Thêm bạn, Thêm nhóm bên dưới giữ nguyên nhưng lọc bỏ nickname khỏi danh sách "Thêm bạn")
     col_m1, col_m2 = st.columns(2)
     with col_m1:
         st.subheader("👤 Thành Viên")
@@ -464,6 +498,7 @@ with tab3:
                         save_data(); st.rerun()
 
         else:
+            
             # CHẾ ĐỘ 2: TÍNH NHANH NỢ CHÉO (BÙ TRỪ)
             st.markdown("### 🔀 Kết quả bù trừ nợ chéo")
             matrix = {m1: {m2: 0 for m2 in st.session_state.members} for m1 in st.session_state.members}
@@ -585,136 +620,102 @@ with tab4:
                     if p == b['payer']: status = "👑 Chủ chi"
                     st.write(f"- {p}: {format_vn(amt)}đ ({status})")
 
-# --- TAB 5: WRAPPED & BẢNG XẾP HẠNG NHÓM ---
-with tab5:
-    # ... (code cũ giữ nguyên)
+# --- TAB 5: WRAPPED & ANALYTICS (Dashboard Cá nhân & Nhóm) ---
+with tab5:
+    st.balloons()
+    my_nick = st.session_state.get('nickname', 'Bạn')
+    st.markdown(f"<h2 style='text-align: center; color: #ff4b4b;'>🎉 Sòng Phẳng Wrapped - {my_nick}</h2>", unsafe_allow_html=True)
+    
     if not st.session_state.history:
-        st.info("Chưa có dữ liệu đi chơi. Hãy lập kèo đi ăn ngay để mở khóa thống kê!")
+        st.info("Chưa có dữ liệu. Hãy ghi bill để mở khóa báo cáo!")
     else:
-        # --- BỘ LỌC THỜI GIAN ---
-        time_filter = st.radio("⏳ Chọn mốc thời gian xem báo cáo:", 
-                               ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
-        st.write("---")
+        # 1. BỘ LỌC THỜI GIAN
+        time_filter = st.radio("⏳ Mốc thời gian:", ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
         
-        # Tách danh sách bill theo mốc thời gian đã chọn
         filtered_history = []
         for b in st.session_state.history:
             try:
-                # Dùng Regex lấy ngày tháng (VD: 25/04/2026)
                 match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', str(b['date']))
                 if match:
-                    d_month = int(match.group(2))
-                    d_year = int(match.group(3))
-                    
-                    if "Tháng này" in time_filter:
-                        if d_month == 4 and d_year == 2026:
-                            filtered_history.append(b)
-                    elif "đầu năm" in time_filter:
-                        if d_year == 2026:
-                            filtered_history.append(b)
-            except: 
-                pass
-                
+                    d_m, d_y = int(match.group(2)), int(match.group(3))
+                    if ("Tháng này" in time_filter and d_m == 4 and d_y == 2026) or ("đầu năm" in time_filter and d_y == 2026):
+                        filtered_history.append(b)
+            except: pass
+
         if not filtered_history:
-            st.warning(f"Chưa có kèo nào được ghi nhận trong mốc: **{time_filter.split(' (')[0]}**")
+            st.warning("Không có dữ liệu trong khoảng thời gian này.")
         else:
-            # --- 1. TÍNH TOÁN DỮ LIỆU CÁ NHÂN ---
-            total_spent = sum(b['amount'] for b in filtered_history)
-            payer_stats = {}
-            debt_stats = {}
-            tra_sua_count = 0
-            
-            # --- 2. TÍNH TOÁN DỮ LIỆU THEO NHÓM (DÀNH CHO LEADERBOARD) ---
-            group_stats = {} 
-            
+            # 2. TÍNH TOÁN LOGIC
+            my_spent = 0
+            others_owe_me = {}
+            i_owe_others = {}
+            group_stats = {}
+            all_unpaid_debts = []
+
             for b in filtered_history:
-                # Tính cá nhân
                 p = b['payer']
-                payer_stats[p] = payer_stats.get(p, 0) + b['amount']
+                splits = b['splits']
+                paid_by = b.get('paid_by', [])
                 
+                # Chi tiêu của tôi
+                if my_nick in splits: my_spent += splits[my_nick]
+                
+                # Nợ nần liên quan đến tôi
                 if b['status'] == 'unpaid':
-                    for debtor, amt in b['splits'].items():
-                        if debtor != p and amt > 0 and debtor not in b.get('paid_by', []):
-                            debt_stats[debtor] = debt_stats.get(debtor, 0) + amt
+                    if p == my_nick:
+                        for d, a in splits.items():
+                            if d != my_nick and d not in paid_by: others_owe_me[d] = others_owe_me.get(d, 0) + a
+                    elif my_nick in splits and my_nick not in paid_by:
+                        i_owe_others[p] = i_owe_others.get(p, 0) + splits[my_nick]
                 
-                # Đếm trà sữa
-                for it in b.get('items', []):
-                    if any(keyword in it['name'].lower() for keyword in ["trà sữa", "ts", "cafe", "nước", "phúc long", "koi"]):
-                        tra_sua_count += it['qty']
-                        
-                # Tính cho Leaderboard Nhóm
-                # Tìm tên nhóm hoặc tạo tên tạm từ các thành viên
-                matched_group_name = None
-                for gn, members in st.session_state.groups.items():
-                    if set(b['splits'].keys()) == set(members):
-                        matched_group_name = gn; break
-                
-                # Nếu không có tên nhóm lưu sẵn, hiển thị những người tham gia
-                group_key = matched_group_name if matched_group_name else "Team: " + ", ".join(sorted(b['splits'].keys()))
-                
-                if group_key not in group_stats:
-                    group_stats[group_key] = {"count": 0, "total_money": 0, "payers": {}}
-                
-                # Cập nhật số liệu cho nhóm đó
-                group_stats[group_key]["count"] += 1
-                group_stats[group_key]["total_money"] += b['amount']
-                
-                # Ai là người trả nhiều nhất trong nhóm này
-                group_stats[group_key]["payers"][p] = group_stats[group_key]["payers"].get(p, 0) + b['amount']
+                # Xếp hạng nợ tổng quát (Cho bảng dưới cùng)
+                if b['status'] == 'unpaid':
+                    for d, a in splits.items():
+                        if d != p and d not in paid_by:
+                            all_unpaid_debts.append({"debtor": d, "creditor": p, "amount": a, "item": b['name']})
 
-            # Tìm danh hiệu cá nhân
-            dai_gia = max(payer_stats, key=payer_stats.get) if payer_stats else "Chưa có"
-            chua_no = max(debt_stats, key=debt_stats.get) if debt_stats else "Trắng nợ"
-            
-            # --- 3. GIAO DIỆN WRAPPED CÁ NHÂN ---
-            st.subheader(f"🏆 Bảng Phong Thần - {time_filter.split(' (')[0]}")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>"
-                            f"<h3>👑 Đại Gia Quẹt Thẻ</h3><h2 style='color:#ff4b4b;'>{dai_gia}</h2>"
-                            f"<p>Tổng ứng: {format_vn(payer_stats.get(dai_gia, 0))}đ</p></div>", unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>"
-                            f"<h3>🐢 Chúa Tể Nợ Nần</h3><h2 style='color:#ff4b4b;'>{chua_no}</h2>"
-                            f"<p>Đang nợ: {format_vn(debt_stats.get(chua_no, 0))}đ</p></div>", unsafe_allow_html=True)
-            with col3:
-                st.markdown(f"<div style='text-align: center; background-color: #f0f2f6; padding: 20px; border-radius: 10px;'>"
-                            f"<h3>💸 Tổng Đốt Tiền</h3><h2 style='color:#ff4b4b;'>{format_vn(total_spent)}đ</h2>"
-                            f"<p>Qua {len(filtered_history)} kèo</p></div>", unsafe_allow_html=True)
-
-            st.write("---")
-            if tra_sua_count > 0:
-                st.success(f"🧋 **Báo động đường huyết:** Trong {time_filter.split(' (')[0].lower()}, nhóm đã tiêu thụ **{tra_sua_count} ly đồ uống**!")
-            
-            # --- 4. LEADERBOARD CÁC NHÓM ĐI CHƠI NHIỀU NHẤT ---
-            st.write("---")
-            st.subheader("🔥 Bảng Xếp Hạng Hội Quẩy (Leaderboard)")
-            st.markdown("Hội nào đang có tần suất họp mặt và 'đốt tiền' ác liệt nhất?")
-            
-            # Sắp xếp các nhóm theo số lần đi chơi giảm dần (nếu bằng nhau thì xét tổng tiền)
-            sorted_groups = sorted(group_stats.items(), key=lambda item: (item[1]['count'], item[1]['total_money']), reverse=True)
-            
-            for index, (g_name, stats) in enumerate(sorted_groups):
-                # Xác định icon Top 3
-                if index == 0: medal = "🥇"
-                elif index == 1: medal = "🥈"
-                elif index == 2: medal = "🥉"
-                else: medal = f"**{index+1}.**"
+                # Thống kê nhóm (Leaderboard)
+                gn = "Nhóm chung"
+                for name, members in st.session_state.groups.items():
+                    if set(splits.keys()) == set(members): gn = name; break
                 
-                # Tìm 'Cá mập' gánh team (người trả nhiều tiền nhất trong nhóm này)
-                shark = max(stats["payers"], key=stats["payers"].get) if stats["payers"] else "Không rõ"
-                
-                # Hiển thị từng nhóm trong thẻ Expander
-                with st.expander(f"{medal} Nhóm: {g_name} - Đi {stats['count']} kèo (Tổng: {format_vn(stats['total_money'])}đ)"):
-                    st.write(f"💸 **Tổng tiền nhóm đã chi:** {format_vn(stats['total_money'])}đ")
-                    st.write(f"👑 **Cá mập gánh team:** {shark} (đã quẹt {format_vn(stats['payers'][shark])}đ)")
-                    
-                    # Thanh tiến trình thể hiện tỉ lệ đóng góp (vui vẻ)
-                    st.write("**Tỉ lệ ứng tiền trong nhóm:**")
-                    for p_name, p_amt in sorted(stats["payers"].items(), key=lambda x: x[1], reverse=True):
-                        st.progress(min(p_amt / stats['total_money'], 1.0), text=f"{p_name}: {format_vn(p_amt)}đ")
+                if gn not in group_stats: group_stats[gn] = {"count": 0, "money": 0}
+                group_stats[gn]["count"] += 1
+                group_stats[gn]["money"] += b['amount']
 
+            # 3. HIỂN THỊ DASHBOARD CÁ NHÂN
+            st.markdown(f"### 📊 Dashboard của {my_nick}")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Tiền bạn đã ăn", f"{format_vn(my_spent)}đ")
+            
+            m_debtor = max(others_owe_me, key=others_owe_me.get) if others_owe_me else "Không ai"
+            c2.metric("Nợ bạn nhiều nhất", m_debtor, f"{format_vn(others_owe_me.get(m_debtor, 0))}đ")
+            
+            m_creditor = max(i_owe_others, key=i_owe_others.get) if i_owe_others else "Không ai"
+            c3.metric("Bạn nợ nhiều nhất", m_creditor, f"-{format_vn(i_owe_others.get(m_creditor, 0))}đ")
+
+            # 4. BẢNG XẾP HẠNG HỘI QUẨY (Leaderboard Nhóm)
             st.write("---")
-            st.subheader("📊 Tỉ trọng người thanh toán chung (Biểu đồ)")
-            if payer_stats:
-                st.bar_chart(payer_stats)
+            st.subheader("🔥 Bảng Xếp Hạng Nhóm (Leaderboard)")
+            sorted_groups = sorted(group_stats.items(), key=lambda x: x[1]['count'], reverse=True)
+            for i, (name, s) in enumerate(sorted_groups):
+                medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🔹"
+                st.write(f"{medal} **{name}**: {s['count']} kèo - Tổng chi: {format_vn(s['money'])}đ")
+
+            # 5. BẢNG XẾP HẠNG CÁC KHOẢN NỢ (Dưới cùng)
+            st.write("---")
+            st.subheader("📉 Xếp hạng các khoản nợ")
+            if all_unpaid_debts:
+                sorted_all = sorted(all_unpaid_debts, key=lambda x: x['amount'], reverse=True)
+                df_debts = []
+                for i, d in enumerate(sorted_all[:10]):
+                    df_debts.append({
+                        "Hạng": f"#{i+1}",
+                        "Người nợ": d['debtor'],
+                        "Người đòi": d['creditor'],
+                        "Số tiền": f"{format_vn(d['amount'])}đ",
+                        "Nội dung": d['item']
+                    })
+                st.table(df_debts)
+            else:
+                st.info("Hiện không có khoản nợ nào để xếp hạng.")
