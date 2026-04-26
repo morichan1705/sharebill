@@ -364,6 +364,55 @@ with tab3:
     else:
         st.subheader("⚙️ Tùy chọn chốt nợ")
         use_netting = st.toggle("🔀 Bật tính nhanh nợ chéo (Bù trừ nợ qua lại)", value=False)
+        
+        # Tự động tạo tin nhắn tổng kết để Copy
+        msg = "📣 TỔNG KẾT CHỐT SỔ SÒNG PHẲNG:\n"
+        
+        if not use_netting:
+            temp_dict = {}
+            for b in unpaid:
+                c = b['payer']
+                p_b = b.get('paid_by', [])
+                for d, a in b['splits'].items():
+                    if d != c and a > 0 and d not in p_b:
+                        temp_dict[(d, c)] = temp_dict.get((d, c), 0) + a
+            if temp_dict:
+                for (d, c), amt in temp_dict.items():
+                    msg += f"👉 {d} nợ {c}: {int(amt):,}đ\n"
+            else:
+                msg += "Hiện không có khoản nợ nào.\n"
+        else:
+            bal = {m: 0 for m in st.session_state.members}
+            for b in unpaid:
+                c = b['payer']
+                p_b = b.get('paid_by', [])
+                bal[c] += (b['amount'] - b['splits'].get(c, 0))
+                for d, a in b['splits'].items():
+                    if d != c and a > 0 and d not in p_b:
+                        bal[d] -= a
+            debtors = [[m, abs(v)] for m, v in bal.items() if v < -1]
+            creditors = [[m, v] for m, v in bal.items() if v > 1]
+            
+            if not debtors:
+                msg += "Không có khoản nợ nào cần bù trừ.\n"
+            else:
+                while debtors and creditors:
+                    debtors.sort(key=lambda x: x[1], reverse=True)
+                    creditors.sort(key=lambda x: x[1], reverse=True)
+                    d_n, d_a = debtors[0]
+                    c_n, c_a = creditors[0]
+                    s_a = min(d_a, c_a)
+                    msg += f"✨ {d_n} chuyển thẳng cho {c_n}: {int(s_a):,}đ\n"
+                    debtors[0][1] -= s_a
+                    creditors[0][1] -= s_a
+                    if debtors[0][1] < 1: debtors.pop(0)
+                    if creditors[0][1] < 1: creditors.pop(0)
+                
+        msg += "\n(Mọi người vào web check bill chi tiết và lấy mã VietQR nha 💸)"
+        
+        with st.expander("📋 Lấy tin nhắn gửi nhóm (Copy nhanh)"):
+            st.code(msg, language="text")
+
         st.write("---")
 
         if not use_netting:
