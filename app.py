@@ -180,7 +180,7 @@ with tab1:
                 else:
                     st.session_state.members[new_f_name.strip()] = {"bank": new_f_bank, "acc": new_f_acc.strip()}
                     save_data()
-                    st.toast(f"Đã thêm {new_f_name} vào danh bạ!", icon="🎉")
+                    st.success(f"Đã thêm {new_f_name} vào danh bạ!")
                     st.rerun()
 
     with col_list_friend:
