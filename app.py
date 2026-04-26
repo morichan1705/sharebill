@@ -88,7 +88,7 @@ if not st.session_state.logged_in:
             else:
                 st.error("Sai òi!")
     
-  with tab_reg:
+    with tab_reg:
         r_user = st.text_input("Tên đăng nhập (ID):", key="reg_id")
         r_pass = st.text_input("Mật khẩu:", type="password", key="reg_pass")
         r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Trúc Lâm)", key="reg_nick") # Ô mới theo yêu cầu
