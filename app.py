@@ -140,7 +140,7 @@ with tab1:
     if my_nick not in st.session_state.members:
         st.session_state.members[my_nick] = {"bank": "", "acc": ""}
 
-with st.expander("Sửa thông tin nhận tiền của bạn (Để người khác quét QR)"):
+    with st.expander("Sửa thông tin nhận tiền của bạn (Để người khác quét QR)"):
         # Chia làm 2 cột cho UI gọn gàng, đẹp mắt
         c1, c2 = st.columns(2)
         
