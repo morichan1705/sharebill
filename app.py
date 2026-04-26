@@ -131,30 +131,29 @@ def format_vn(num):
 st.title("💸 Share Bills Ultimate V6")
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["👥 Danh Bạ & Nhóm", "🧾 Ghi Hóa Đơn", "🔥 Chốt Sổ Nợ", "🕒 Nhật Ký Bill", "🎁 Wrapped & Thống Kê"])
 
-# --- TAB 1: DANH BẠ & NHÓM ---
+# --- TAB 1: DANH BẠ ---
 with tab1:
-    my_nick = st.session_state.get('nickname', 'Bản thân')
-    st.markdown(f"### 👤 Thông tin cá nhân ({my_nick})")
+    # 1. BẮT BUỘC KHAI BÁO NICKNAME Ở ĐÂY ĐỂ TRÁNH LỖI NAMEERROR
+    nickname = st.session_state.get('nickname', 'Bản thân')
     
-    # Đảm bảo có entry cho bản thân trong members
-    if my_nick not in st.session_state.members:
-        st.session_state.members[my_nick] = {"bank": "", "acc": ""}
+    st.markdown(f"### 👤 Thông tin cá nhân ({nickname})")
+    
+    # Tự động tạo dữ liệu cho bản thân nếu chưa có
+    if nickname not in st.session_state.members:
+        st.session_state.members[nickname] = {"bank": "", "acc": ""}
 
+    # 2. Phần sửa thông tin cá nhân
     with st.expander("Sửa thông tin nhận tiền của bạn (Để người khác quét QR)"):
-        # Chia làm 2 cột cho UI gọn gàng, đẹp mắt
         c1, c2 = st.columns(2)
         
-        # 1. Danh sách các ngân hàng phổ biến
         bank_list = ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG", "ACB", "SHB", "STB", "VIB"]
         
-        # 2. Lấy dữ liệu cũ một cách an toàn bằng hàm .get()
+        # Nhờ có dòng khai báo nickname ở trên, 2 dòng dưới đây sẽ không còn báo lỗi
         saved_bank = st.session_state.members[nickname].get('bank', '')
         saved_acc = st.session_state.members[nickname].get('acc', '')
         
-        # 3. Tìm vị trí của ngân hàng cũ. Nếu chưa có hoặc nhập sai thì để mặc định là 0 (ô trống)
         default_idx = bank_list.index(saved_bank) if saved_bank in bank_list else 0
         
-        # 4. Gắn vào Selectbox và Text_input
         my_bank = c1.selectbox("Ngân hàng:", bank_list, index=default_idx)
         my_acc = c2.text_input("Số tài khoản:", value=saved_acc)
         
@@ -163,9 +162,10 @@ with tab1:
             save_data()
             st.toast("Đã cập nhật số tài khoản thành công!", icon="✅")
             st.rerun()
-    
+            
     st.write("---")
-    st.markdown("### 👥 Quản lý Bạn bè & Nhóm")
+    st.markdown("### 👥 Danh bạ bạn bè & Nhóm")
+ 
     # (Các phần Thêm bạn, Thêm nhóm bên dưới giữ nguyên nhưng lọc bỏ nickname khỏi danh sách "Thêm bạn")
     col_m1, col_m2 = st.columns(2)
     with col_m1:
