@@ -300,7 +300,7 @@ with tab3:
                 dl_date = datetime.strptime(b['deadline'], "%d/%m/%Y").date()
                 days_left = (dl_date - today).days
                 
-                if 0 <= days_left <= 3:
+                if 0 <= days_left <= 7:
                     urgent_alerts.append({
                         "name": b['name'],
                         "days": days_left,
@@ -500,14 +500,14 @@ with tab4:
                     if p == b['payer']: status = "👑 Chủ chi"
                     st.write(f"- {p}: {format_vn(amt)}đ ({status})")
 
-# --- TAB 5: WRAPPED & THỐNG KÊ (Theo mốc thời gian) ---
+# --- TAB 5: WRAPPED & BẢNG XẾP HẠNG NHÓM ---
 with tab5:
     st.markdown("<h2 style='text-align: center; color: #ff4b4b;'>🎉 Sòng Phẳng Wrapped</h2>", unsafe_allow_html=True)
     
     if not st.session_state.history:
         st.info("Chưa có dữ liệu đi chơi. Hãy lập kèo đi ăn ngay để mở khóa thống kê!")
     else:
-       # --- BỘ LỌC THỜI GIAN ---
+        # --- BỘ LỌC THỜI GIAN ---
         time_filter = st.radio("⏳ Chọn mốc thời gian xem báo cáo:", 
                                ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
         st.write("---")
@@ -516,13 +516,12 @@ with tab5:
         filtered_history = []
         for b in st.session_state.history:
             try:
-                # Dùng Regex để moi chính xác định dạng dd/mm/yyyy ra, bất chấp AI viết dư dấu cách
+                # Dùng Regex lấy ngày tháng (VD: 25/04/2026)
                 match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', str(b['date']))
                 if match:
                     d_month = int(match.group(2))
                     d_year = int(match.group(3))
                     
-                    # Dùng chữ "in" để kiểm tra từ khóa thay vì bắt khớp 100% từng dấu cách
                     if "Tháng này" in time_filter:
                         if d_month == 4 and d_year == 2026:
                             filtered_history.append(b)
@@ -530,20 +529,22 @@ with tab5:
                         if d_year == 2026:
                             filtered_history.append(b)
             except: 
-                pass # Bỏ qua an toàn nếu bill bị lỗi ngày
+                pass
                 
-        # Nếu khoảng thời gian được chọn không có dữ liệu
         if not filtered_history:
             st.warning(f"Chưa có kèo nào được ghi nhận trong mốc: **{time_filter.split(' (')[0]}**")
         else:
-            # --- 1. TÍNH TOÁN DỮ LIỆU TỔNG QUAN (Chỉ tính trên filtered_history) ---
+            # --- 1. TÍNH TOÁN DỮ LIỆU CÁ NHÂN ---
             total_spent = sum(b['amount'] for b in filtered_history)
             payer_stats = {}
             debt_stats = {}
             tra_sua_count = 0
-            group_dates = {} 
+            
+            # --- 2. TÍNH TOÁN DỮ LIỆU THEO NHÓM (DÀNH CHO LEADERBOARD) ---
+            group_stats = {} 
             
             for b in filtered_history:
+                # Tính cá nhân
                 p = b['payer']
                 payer_stats[p] = payer_stats.get(p, 0) + b['amount']
                 
@@ -552,43 +553,36 @@ with tab5:
                         if debtor != p and amt > 0 and debtor not in b.get('paid_by', []):
                             debt_stats[debtor] = debt_stats.get(debtor, 0) + amt
                 
+                # Đếm trà sữa
                 for it in b.get('items', []):
                     if any(keyword in it['name'].lower() for keyword in ["trà sữa", "ts", "cafe", "nước", "phúc long", "koi"]):
                         tra_sua_count += it['qty']
                         
+                # Tính cho Leaderboard Nhóm
+                # Tìm tên nhóm hoặc tạo tên tạm từ các thành viên
                 matched_group_name = None
                 for gn, members in st.session_state.groups.items():
                     if set(b['splits'].keys()) == set(members):
                         matched_group_name = gn; break
                 
-                group_key = matched_group_name if matched_group_name else "Kèo: " + ", ".join(sorted(b['splits'].keys()))
-                if group_key not in group_dates: group_dates[group_key] = []
+                # Nếu không có tên nhóm lưu sẵn, hiển thị những người tham gia
+                group_key = matched_group_name if matched_group_name else "Team: " + ", ".join(sorted(b['splits'].keys()))
                 
-                try:
-                    date_str = b['date'].split(" ")[0]
-                    group_dates[group_key].append(datetime.strptime(date_str, "%d/%m/%Y").date())
-                except: pass
+                if group_key not in group_stats:
+                    group_stats[group_key] = {"count": 0, "total_money": 0, "payers": {}}
                 
-            # --- 2. TÌM DANH HIỆU ---
+                # Cập nhật số liệu cho nhóm đó
+                group_stats[group_key]["count"] += 1
+                group_stats[group_key]["total_money"] += b['amount']
+                
+                # Ai là người trả nhiều nhất trong nhóm này
+                group_stats[group_key]["payers"][p] = group_stats[group_key]["payers"].get(p, 0) + b['amount']
+
+            # Tìm danh hiệu cá nhân
             dai_gia = max(payer_stats, key=payer_stats.get) if payer_stats else "Chưa có"
             chua_no = max(debt_stats, key=debt_stats.get) if debt_stats else "Trắng nợ"
             
-            # --- 3. TÍNH STREAK ---
-            group_streaks = {}
-            for g_name, dates_list in group_dates.items():
-                dates_list = sorted(list(set(dates_list)))
-                streak = 0
-                if dates_list:
-                    streak = 1
-                    for i in range(1, len(dates_list)):
-                        if (dates_list[i] - dates_list[i-1]).days <= 7: streak += 1
-                        else: streak = 1 
-                group_streaks[g_name] = streak
-                
-            champion_group = max(group_streaks, key=group_streaks.get) if group_streaks else "Chưa có"
-            champion_streak = group_streaks.get(champion_group, 0)
-
-            # --- 4. GIAO DIỆN WRAPPED ---
+            # --- 3. GIAO DIỆN WRAPPED CÁ NHÂN ---
             st.subheader(f"🏆 Bảng Phong Thần - {time_filter.split(' (')[0]}")
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -605,22 +599,38 @@ with tab5:
                             f"<p>Qua {len(filtered_history)} kèo</p></div>", unsafe_allow_html=True)
 
             st.write("---")
-            
-            # --- 5. THỐNG KÊ VUI ---
             if tra_sua_count > 0:
                 st.success(f"🧋 **Báo động đường huyết:** Trong {time_filter.split(' (')[0].lower()}, nhóm đã tiêu thụ **{tra_sua_count} ly đồ uống**!")
-                
-            # --- 6. CHUỖI VÀ BẢNG XẾP HẠNG ---
-            st.subheader("🔥 Cuộc Đua Chuỗi Đi Chơi (Streak)")
-            if champion_streak > 0:
-                st.markdown(f"🥇 **Hội Quẩy Nhiệt Nhất:** Nhóm `{champion_group}` đang dẫn đầu với **{champion_streak} kèo liên tiếp**! 🔥")
             
-            with st.expander("Bảng xếp hạng Streak các nhóm"):
-                for g, s in sorted(group_streaks.items(), key=lambda item: item[1], reverse=True):
-                    icon = "🔥" if s >= 3 else "🌱"
-                    st.write(f"{icon} **{g}**: {s} kèo liên tiếp")
-                    
+            # --- 4. LEADERBOARD CÁC NHÓM ĐI CHƠI NHIỀU NHẤT ---
             st.write("---")
-            st.subheader("📊 Tỉ trọng người thanh toán (Biểu đồ)")
+            st.subheader("🔥 Bảng Xếp Hạng Hội Quẩy (Leaderboard)")
+            st.markdown("Hội nào đang có tần suất họp mặt và 'đốt tiền' ác liệt nhất?")
+            
+            # Sắp xếp các nhóm theo số lần đi chơi giảm dần (nếu bằng nhau thì xét tổng tiền)
+            sorted_groups = sorted(group_stats.items(), key=lambda item: (item[1]['count'], item[1]['total_money']), reverse=True)
+            
+            for index, (g_name, stats) in enumerate(sorted_groups):
+                # Xác định icon Top 3
+                if index == 0: medal = "🥇"
+                elif index == 1: medal = "🥈"
+                elif index == 2: medal = "🥉"
+                else: medal = f"**{index+1}.**"
+                
+                # Tìm 'Cá mập' gánh team (người trả nhiều tiền nhất trong nhóm này)
+                shark = max(stats["payers"], key=stats["payers"].get) if stats["payers"] else "Không rõ"
+                
+                # Hiển thị từng nhóm trong thẻ Expander
+                with st.expander(f"{medal} Nhóm: {g_name} - Đi {stats['count']} kèo (Tổng: {format_vn(stats['total_money'])}đ)"):
+                    st.write(f"💸 **Tổng tiền nhóm đã chi:** {format_vn(stats['total_money'])}đ")
+                    st.write(f"👑 **Cá mập gánh team:** {shark} (đã quẹt {format_vn(stats['payers'][shark])}đ)")
+                    
+                    # Thanh tiến trình thể hiện tỉ lệ đóng góp (vui vẻ)
+                    st.write("**Tỉ lệ ứng tiền trong nhóm:**")
+                    for p_name, p_amt in sorted(stats["payers"].items(), key=lambda x: x[1], reverse=True):
+                        st.progress(min(p_amt / stats['total_money'], 1.0), text=f"{p_name}: {format_vn(p_amt)}đ")
+
+            st.write("---")
+            st.subheader("📊 Tỉ trọng người thanh toán chung (Biểu đồ)")
             if payer_stats:
                 st.bar_chart(payer_stats)
