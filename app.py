@@ -560,7 +560,14 @@ with tab3:
                                 st.caption(f"&nbsp;&nbsp;&nbsp;&nbsp;⏰ Hạn chót: {item['deadline']}")
                     
                     st.write("---")
-                    c_info = st.session_state.members[creditor]
+                    
+                   c_info = st.session_state.members.get(creditor, None)
+                    if c_info:
+                        st.write(f"🏦 Ngân hàng: {c_info['bank']}")
+                        st.write(f"💳 STK: {c_info['acc']}")
+                    else:
+                        st.warning(f"⚠️ Không tìm thấy thông tin của **{creditor}** trong danh bạ. Có vẻ người này đã bị xóa hoặc viết sai tên!")
+                    
                     if c_info['bank'] and c_info['acc']:
                         qr_url = f"https://img.vietqr.io/image/{c_info['bank']}-{c_info['acc']}-compact2.png?amount={int(total_owed)}&addInfo={debtor}chuyentien"
                         st.image(qr_url, caption="QR Chuyển khoản", width=250)
