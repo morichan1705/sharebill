@@ -9,6 +9,42 @@ import PIL.Image
 
 # --- 1. CẤU HÌNH & LƯU TRỮ ---
 st.set_page_config(page_title="Share Bills Ultimate V6", page_icon="💸", layout="wide")
+# --- TÙY CHỈNH CSS NÂNG CAO ---
+st.markdown("""
+    <style>
+    /* 1. Bo tròn và tạo hiệu ứng nổi cho tất cả các nút bấm */
+    div.stButton > button {
+        border-radius: 25px;
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    /* Hiệu ứng khi di chuột vào nút */
+    div.stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(255, 75, 75, 0.4);
+    }
+    
+    /* 2. Làm đẹp thanh Tab Menu trên cùng */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 10px 10px 0 0;
+        padding: 10px 15px;
+    }
+    
+    /* 3. Ẩn chữ "Made with Streamlit" ở dưới cùng cho chuyên nghiệp */
+    footer {visibility: hidden;}
+    
+    /* 4. Làm đẹp các ô Expander (Thẻ thả xuống) */
+    [data-testid="stExpander"] {
+        border: 1px solid #ffeaeb;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+    </style>
+""", unsafe_allow_html=True)
 # --- HỆ THỐNG ĐĂNG NHẬP (USER AUTHENTICATION) ---
 USERS_FILE = 'users.json'
 
@@ -285,7 +321,7 @@ with tab2:
             st.session_state.current_items = []
             st.session_state.ai_date = datetime.now().strftime("%d/%m/%Y %H:%M")
             save_data()
-            st.success("Đã lưu!")
+            st.toast("✅ Đã lưu vào sổ nợ thành công!", icon="💸")
             st.rerun()
 
 # --- TAB 3: CHỐT SỔ (Bù trừ nợ chéo & Có Deadline) ---
@@ -502,8 +538,10 @@ with tab4:
 
 # --- TAB 5: WRAPPED & BẢNG XẾP HẠNG NHÓM ---
 with tab5:
+    # Mỗi lần mở Tab 5 là bóng bay ngập trời
+    st.balloons() 
     st.markdown("<h2 style='text-align: center; color: #ff4b4b;'>🎉 Sòng Phẳng Wrapped</h2>", unsafe_allow_html=True)
-    
+    # ... (code cũ giữ nguyên)
     if not st.session_state.history:
         st.info("Chưa có dữ liệu đi chơi. Hãy lập kèo đi ăn ngay để mở khóa thống kê!")
     else:
