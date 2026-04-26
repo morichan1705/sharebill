@@ -156,7 +156,7 @@ with tab1:
         if st.button("💾 Cập nhật thông tin bản thân", type="primary"):
             st.session_state.members[nickname] = {"bank": my_bank, "acc": my_acc}
             save_data()
-            st.success("Đã cập nhật số tài khoản thành công!")
+            st.toast("Đã cập nhật số tài khoản thành công!", icon="✅")
             st.rerun()
 
     st.write("---")
@@ -180,7 +180,7 @@ with tab1:
                 else:
                     st.session_state.members[new_f_name.strip()] = {"bank": new_f_bank, "acc": new_f_acc.strip()}
                     save_data()
-                    st.success("Đã thêm {new_f_name} vào danh bạ!")
+                    st.toast(f"Đã thêm {new_f_name} vào danh bạ!", icon="🎉")
                     st.rerun()
 
     with col_list_friend:
@@ -204,13 +204,13 @@ with tab1:
                     if bc1.button("💾 Lưu thay đổi", key=f"save_btn_{f_name}", use_container_width=True):
                         st.session_state.members[f_name] = {"bank": edit_f_bank, "acc": edit_f_acc}
                         save_data()
-                        st.success("Đã cập nhật thông tin của {f_name}!")
+                        st.toast(f"Đã cập nhật thông tin của {f_name}!", icon="✅")
                         st.rerun()
                         
                     if bc2.button("🗑️ Xóa bạn", key=f"del_btn_{f_name}", use_container_width=True):
                         st.session_state.members.pop(f_name)
                         save_data()
-                        st.success("Đã xóa {f_name} khỏi danh bạ!")
+                        st.toast(f"Đã xóa {f_name} khỏi danh bạ!", icon="🗑️")
                         st.rerun()
 
     st.write("---")
@@ -238,7 +238,7 @@ with tab1:
                 else:
                     st.session_state.groups[new_g_name.strip()] = new_g_members
                     save_data()
-                    st.success(f"Đã tạo nhóm {new_g_name} thành công!")
+                    st.toast(f"Đã tạo nhóm {new_g_name} thành công!", icon="🎉")
                     st.rerun()
 
     with col_list_group:
@@ -260,13 +260,13 @@ with tab1:
                         else:
                             st.session_state.groups[g_name] = edit_g_members
                             save_data()
-                            st.success(f"Đã cập nhật nhóm {g_name}!")
+                            st.toast(f"Đã cập nhật nhóm {g_name}!", icon="✅")
                             st.rerun()
                             
                     if gc2.button("🗑️ Xóa nhóm", key=f"del_g_{g_name}", use_container_width=True):
                         st.session_state.groups.pop(g_name)
                         save_data()
-                        st.success(f"Đã giải tán nhóm {g_name}!")
+                        st.toast(f"Đã giải tán nhóm {g_name}!", icon="🧨")
                         st.rerun()
 # --- TAB 2: GHI HÓA ĐƠN ---
 with tab2:
@@ -676,7 +676,6 @@ with tab4:
 
 # --- TAB 5: WRAPPED & ANALYTICS (Dashboard Cá nhân & Nhóm) ---
 with tab5:
-    st.balloons()
     my_nick = st.session_state.get('nickname', 'Bạn')
     st.markdown(f"<h2 style='text-align: center; color: #ff4b4b;'>🎉 Sòng Phẳng Wrapped - {my_nick}</h2>", unsafe_allow_html=True)
     
