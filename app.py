@@ -225,8 +225,14 @@ with tab1:
         st.markdown("#### ➕ Tạo nhóm mới")
         with st.container(border=True):
             new_g_name = st.text_input("Tên nhóm:", placeholder="Ví dụ: Nhóm Trà Sữa...")
-            # Mặc định luôn tick sẵn tên của bản thân vào nhóm
-            new_g_members = st.multiselect("Chọn thành viên:", all_members_list, default=[nickname], key="new_g_members")
+           # Đổi dòng new_g_members cũ thành dòng này:
+            new_g_members = st.multiselect(
+                "Chọn thành viên:", 
+                all_members_list, 
+                default=[nickname], 
+                format_func=lambda x: f"Bản thân ({x})" if x == nickname else x,
+                key="new_g_members"
+            )
             
             if st.button("➕ Lập nhóm", use_container_width=True):
                 if not new_g_name.strip():
@@ -251,7 +257,14 @@ with tab1:
                 with st.expander(f"📌 Nhóm: {g_name} ({len(g_members)} thành viên)"):
                     # Lọc ra những thành viên hợp lệ (nhỡ may bạn đã xóa ai đó khỏi danh bạ ở trên)
                     valid_members = [m for m in g_members if m in all_members_list]
-                    edit_g_members = st.multiselect("Chỉnh sửa thành viên:", all_members_list, default=valid_members, key=f"edit_g_{g_name}")
+                    # Đổi dòng edit_g_members cũ thành dòng này:
+                    edit_g_members = st.multiselect(
+                        "Chỉnh sửa thành viên:", 
+                        all_members_list, 
+                        default=valid_members, 
+                        format_func=lambda x: f"Bản thân ({x})" if x == nickname else x,
+                        key=f"edit_g_{g_name}"
+                    )
                     
                     gc1, gc2 = st.columns(2)
                     if gc1.button("💾 Lưu thay đổi", key=f"save_g_{g_name}", use_container_width=True):
@@ -269,6 +282,10 @@ with tab1:
                         st.toast(f"Đã giải tán nhóm {g_name}!", icon="🧨")
                         st.rerun()
 # --- TAB 2: GHI HÓA ĐƠN ---
+# 1. KHAI BÁO TÊN Ở ĐÂY (Vị trí đầu tiên bên trong Tab 2)
+    my_nick = st.session_state.get('nickname', 'Bản thân')
+    
+    st.subheader("📝 Ghi hóa đơn mới")
 with tab2:
     if 'current_items' not in st.session_state: st.session_state.current_items = []
    
@@ -352,11 +369,20 @@ with tab2:
     b_title = c_info1.text_input("Tiêu đề bill:", value="Đi ăn")
     # Hiển thị ngày giờ AI quét được, hoặc ngày giờ hiện tại nếu AI không tìm thấy
     b_date = c_info2.text_input("Thời gian (AI tự điền):", value=st.session_state.get("ai_date", datetime.now().strftime("%d/%m/%Y %H:%M")))
-    b_payer = st.selectbox("Ai trả tiền?", list(st.session_state.members.keys()))
+    b_payer = st.selectbox(
+        "Ai trả tiền?", 
+        list(st.session_state.members.keys()), 
+        format_func=lambda x: f"Bản thân ({x})" if x == my_nick else x
+    )
     use_g = st.selectbox("Chọn nhóm (để tick nhanh):", ["-- Chọn lẻ --"] + list(st.session_state.groups.keys()))
     def_m = list(st.session_state.members.keys())
     if use_g != "-- Chọn lẻ --": def_m = st.session_state.groups[use_g]
-    b_cons = st.multiselect("Ai tham gia?", list(st.session_state.members.keys()), default=def_m)
+    # Tìm dòng b_cons (nếu bạn đang dùng multiselect để chọn người) và thay bằng:
+    b_cons = st.multiselect(
+        "Chọn người tham gia (nếu không chọn nhóm):", 
+        list(st.session_state.members.keys()),
+        format_func=lambda x: f"Bản thân ({x})" if x == my_nick else x
+    )
 
     if total_bill == 0:
         q_amt = st.text_input("💰 Nhập tổng bill nhanh ở đây:", value="0")
@@ -698,28 +724,42 @@ with tab5:
         if not filtered_history:
             st.warning("Không có dữ liệu trong khoảng thời gian này.")
         else:
-            # 2. TÍNH TOÁN LOGIC
+            # 2. TÍNH TOÁN LOGIC (BẢN VÁ LỖI CHỮ HOA/THƯỜNG)
             my_spent = 0
             others_owe_me = {}
             i_owe_others = {}
             group_stats = {}
             all_unpaid_debts = []
 
+            # Đưa nickname về dạng chữ thường và bỏ dấu cách thừa để tiện so sánh
+            my_nick_lower = my_nick.strip().lower()
+
             for b in filtered_history:
                 p = b['payer']
                 splits = b['splits']
                 paid_by = b.get('paid_by', [])
                 
+                # Cố gắng tìm tên thật của mình trong bill (Bất chấp viết hoa/thường)
+                my_name_in_bill = None
+                for name in splits.keys():
+                    if name.strip().lower() == my_nick_lower:
+                        my_name_in_bill = name
+                        break
+                        
+                payer_lower = p.strip().lower()
+
                 # Chi tiêu của tôi
-                if my_nick in splits: my_spent += splits[my_nick]
+                if my_name_in_bill in splits: 
+                    my_spent += splits[my_name_in_bill]
                 
                 # Nợ nần liên quan đến tôi
                 if b['status'] == 'unpaid':
-                    if p == my_nick:
+                    if payer_lower == my_nick_lower: # Mình là người trả bill này
                         for d, a in splits.items():
-                            if d != my_nick and d not in paid_by: others_owe_me[d] = others_owe_me.get(d, 0) + a
-                    elif my_nick in splits and my_nick not in paid_by:
-                        i_owe_others[p] = i_owe_others.get(p, 0) + splits[my_nick]
+                            if d.strip().lower() != my_nick_lower and d not in paid_by: 
+                                others_owe_me[d] = others_owe_me.get(d, 0) + a
+                    elif my_name_in_bill in splits and my_name_in_bill not in paid_by: # Người khác trả, mình nợ
+                        i_owe_others[p] = i_owe_others.get(p, 0) + splits[my_name_in_bill]
                 
                 # Xếp hạng nợ tổng quát (Cho bảng dưới cùng)
                 if b['status'] == 'unpaid':
@@ -736,16 +776,35 @@ with tab5:
                 group_stats[gn]["count"] += 1
                 group_stats[gn]["money"] += b['amount']
 
-            # 3. HIỂN THỊ DASHBOARD CÁ NHÂN
+            # 3. HIỂN THỊ DASHBOARD CÁ NHÂN TÙY CHỈNH
             st.markdown(f"### 📊 Dashboard của {my_nick}")
             c1, c2, c3 = st.columns(3)
-            c1.metric("Tiền bạn đã ăn", f"{format_vn(my_spent)}đ")
             
+            # Đổi chữ "ăn" thành "chi"
+            c1.metric("Tiền bạn đã chi", f"{format_vn(my_spent)}đ")
+            
+            # Tính tổng nợ để hiển thị tỷ lệ
+            total_others_owe_me = sum(others_owe_me.values())
+            total_i_owe_others = sum(i_owe_others.values())
+            
+            # Tìm người nợ mình nhiều nhất
             m_debtor = max(others_owe_me, key=others_owe_me.get) if others_owe_me else "Không ai"
-            c2.metric("Nợ bạn nhiều nhất", m_debtor, f"{format_vn(others_owe_me.get(m_debtor, 0))}đ")
+            m_debtor_amt = others_owe_me.get(m_debtor, 0)
             
+            if m_debtor != "Không ai":
+                # Hiển thị: Tên ở trên, [Số tiền / Tổng] ở dưới bằng tham số delta
+                c2.metric("Nợ bạn nhiều nhất", m_debtor, f"{format_vn(m_debtor_amt)}đ / Tổng: {format_vn(total_others_owe_me)}đ", delta_color="normal")
+            else:
+                c2.metric("Nợ bạn nhiều nhất", "Không ai", "0đ / Tổng: 0đ", delta_color="off")
+            
+            # Tìm người mình nợ nhiều nhất
             m_creditor = max(i_owe_others, key=i_owe_others.get) if i_owe_others else "Không ai"
-            c3.metric("Bạn nợ nhiều nhất", m_creditor, f"-{format_vn(i_owe_others.get(m_creditor, 0))}đ")
+            m_creditor_amt = i_owe_others.get(m_creditor, 0)
+            
+            if m_creditor != "Không ai":
+                c3.metric("Bạn nợ nhiều nhất", m_creditor, f"-{format_vn(m_creditor_amt)}đ / Tổng: -{format_vn(total_i_owe_others)}đ", delta_color="inverse")
+            else:
+                c3.metric("Bạn nợ nhiều nhất", "Không ai", "0đ / Tổng: 0đ", delta_color="off")
 
             # 4. BẢNG XẾP HẠNG HỘI QUẨY (Leaderboard Nhóm)
             st.write("---")
@@ -755,20 +814,32 @@ with tab5:
                 medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🔹"
                 st.write(f"{medal} **{name}**: {s['count']} kèo - Tổng chi: {format_vn(s['money'])}đ")
 
-            # 5. BẢNG XẾP HẠNG CÁC KHOẢN NỢ (Dưới cùng)
+           # 5. BIỂU ĐỒ XẾP HẠNG CÁC KHOẢN NỢ (Bar Chart)
             st.write("---")
-            st.subheader("📉 Xếp hạng các khoản nợ")
+            st.subheader("📊 Biểu đồ Xếp hạng Nợ (Top 10)")
+            st.markdown("Cột càng cao, nợ càng 'khủng'. Nhìn biểu đồ để biết ai cần được ưu tiên đòi nợ trước nhé!")
+
             if all_unpaid_debts:
+                import pandas as pd
+                # Sắp xếp và lấy top 10 khoản nợ lớn nhất
                 sorted_all = sorted(all_unpaid_debts, key=lambda x: x['amount'], reverse=True)
-                df_debts = []
-                for i, d in enumerate(sorted_all[:10]):
-                    df_debts.append({
-                        "Hạng": f"#{i+1}",
-                        "Người nợ": d['debtor'],
-                        "Người đòi": d['creditor'],
-                        "Số tiền": f"{format_vn(d['amount'])}đ",
-                        "Nội dung": d['item']
-                    })
-                st.table(df_debts)
+                top_10 = sorted_all[:10]
+                
+                # Tạo dữ liệu cho biểu đồ
+                # Nhãn bao gồm: Người nợ -> Chủ nợ (Tên món)
+                chart_labels = [f"{d['debtor']} ➜ {d['creditor']}\n({d['item']})" for d in top_10]
+                chart_values = [d['amount'] for d in top_10]
+                
+                df_chart = pd.DataFrame({
+                    "Khoản nợ": chart_labels,
+                    "Số tiền (VNĐ)": chart_values
+                }).set_index("Khoản nợ")
+                
+                # Hiển thị biểu đồ cột với màu san hô đặc trưng của app
+                st.bar_chart(df_chart, color="#ff4b4b")
+                
+                # Vẫn giữ lại một bảng chi tiết nhỏ bên dưới để xem số chính xác khi cần
+                with st.expander("🔍 Xem chi tiết bảng số liệu"):
+                    st.table(df_chart.style.format("{:,}₫"))
             else:
-                st.info("Hiện không có khoản nợ nào để xếp hạng.")
+                st.info("Sổ nợ trống, không có gì để vẽ biểu đồ cả! 🎉")
