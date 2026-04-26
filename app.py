@@ -131,78 +131,143 @@ def format_vn(num):
 st.title("💸 Share Bills Ultimate V6")
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["👥 Danh Bạ & Nhóm", "🧾 Ghi Hóa Đơn", "🔥 Chốt Sổ Nợ", "🕒 Nhật Ký Bill", "🎁 Wrapped & Thống Kê"])
 
-# --- TAB 1: DANH BẠ ---
+# --- TAB 1: DANH BẠ & THÔNG TIN CÁ NHÂN ---
 with tab1:
-    # 1. BẮT BUỘC KHAI BÁO NICKNAME Ở ĐÂY ĐỂ TRÁNH LỖI NAMEERROR
+    # --- PHẦN 1: BẢN THÂN ---
     nickname = st.session_state.get('nickname', 'Bản thân')
-    
     st.markdown(f"### 👤 Thông tin cá nhân ({nickname})")
     
-    # Tự động tạo dữ liệu cho bản thân nếu chưa có
+    # Khởi tạo data nếu chưa có
     if nickname not in st.session_state.members:
         st.session_state.members[nickname] = {"bank": "", "acc": ""}
+        if 'groups' not in st.session_state: st.session_state.groups = {}
 
-    # 2. Phần sửa thông tin cá nhân
-    with st.expander("Sửa thông tin nhận tiền của bạn (Để người khác quét QR)"):
+    bank_list = ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG", "ACB", "SHB", "STB", "VIB"]
+
+    with st.expander("⚙️ Sửa thông tin nhận tiền của bạn (Để người khác quét QR)"):
         c1, c2 = st.columns(2)
-        
-        bank_list = ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG", "ACB", "SHB", "STB", "VIB"]
-        
-        # Nhờ có dòng khai báo nickname ở trên, 2 dòng dưới đây sẽ không còn báo lỗi
         saved_bank = st.session_state.members[nickname].get('bank', '')
         saved_acc = st.session_state.members[nickname].get('acc', '')
-        
         default_idx = bank_list.index(saved_bank) if saved_bank in bank_list else 0
         
-        my_bank = c1.selectbox("Ngân hàng:", bank_list, index=default_idx)
-        my_acc = c2.text_input("Số tài khoản:", value=saved_acc)
+        my_bank = c1.selectbox("Ngân hàng:", bank_list, index=default_idx, key="my_bank_select")
+        my_acc = c2.text_input("Số tài khoản:", value=saved_acc, key="my_acc_input")
         
-        if st.button("Cập nhật thông tin bản thân"):
+        if st.button("💾 Cập nhật thông tin bản thân", type="primary"):
             st.session_state.members[nickname] = {"bank": my_bank, "acc": my_acc}
             save_data()
             st.toast("Đã cập nhật số tài khoản thành công!", icon="✅")
             st.rerun()
-            
+
     st.write("---")
-    st.markdown("### 👥 Danh bạ bạn bè & Nhóm")
- 
-    # (Các phần Thêm bạn, Thêm nhóm bên dưới giữ nguyên nhưng lọc bỏ nickname khỏi danh sách "Thêm bạn")
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        st.subheader("👤 Thành Viên")
-        n_name = st.text_input("Tên mới:")
-        n_bank = st.selectbox("Ngân hàng:", ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG"])
-        # Thêm thuộc tính key=f"acc_{name}" (hoặc biến tên tương ứng trong vòng lặp của bạn)
-        n_acc = st.text_input("Số tài khoản:", value=info['acc'], key=f"acc_input_{name}")
-        if st.button("➕ Lưu người mới"):
-            if n_name: st.session_state.members[n_name] = {"bank": n_bank, "acc": n_acc}; save_data(); st.rerun()
-        
-        if st.session_state.members:
-            with st.expander("📝 Sửa/Xóa thành viên"):
-                m_edit = st.selectbox("Chọn người:", list(st.session_state.members.keys()))
-                eb = st.text_input("Ngân hàng mới:", value=st.session_state.members[m_edit]['bank'])
-                ea = st.text_input("STK mới:", value=st.session_state.members[m_edit]['acc'])
-                if st.button("💾 Lưu sửa"):
-                    st.session_state.members[m_edit] = {"bank": eb, "acc": ea}; save_data(); st.rerun()
-                if st.button("🗑️ Xóa người"):
-                    del st.session_state.members[m_edit]; save_data(); st.rerun()
 
-    with col_m2:
-        st.subheader("👨‍👩‍👧‍👦 Quản Lý Nhóm")
-        g_n = st.text_input("Tên nhóm mới:")
-        g_m = st.multiselect("Thành viên nhóm:", list(st.session_state.members.keys()))
-        if st.button("➕ Tạo Nhóm"):
-            if g_n and g_m: st.session_state.groups[g_n] = g_m; save_data(); st.rerun()
-        
-        if st.session_state.groups:
-            with st.expander("📝 Chỉnh sửa/Xóa nhóm"):
-                g_edit = st.selectbox("Chọn nhóm:", list(st.session_state.groups.keys()))
-                new_gm = st.multiselect("Sửa thành viên:", list(st.session_state.members.keys()), default=st.session_state.groups[g_edit])
-                if st.button("💾 Cập nhật nhóm"):
-                    st.session_state.groups[g_edit] = new_gm; save_data(); st.rerun()
-                if st.button("🗑️ Xóa nhóm này"):
-                    del st.session_state.groups[g_edit]; save_data(); st.rerun()
+    # --- PHẦN 2: BẠN BÈ ---
+    st.markdown("### 👥 Quản lý Bạn bè")
+    col_add_friend, col_list_friend = st.columns([1, 1.5], gap="large")
 
+    with col_add_friend:
+        st.markdown("#### ➕ Thêm bạn mới")
+        with st.container(border=True):
+            new_f_name = st.text_input("Tên người bạn:", placeholder="Ví dụ: Hồng, Thắng...")
+            new_f_bank = st.selectbox("Ngân hàng (Tùy chọn):", bank_list, key="new_f_bank")
+            new_f_acc = st.text_input("Số tài khoản (Tùy chọn):", key="new_f_acc")
+            
+            if st.button("➕ Thêm người này", use_container_width=True):
+                if not new_f_name.strip():
+                    st.warning("Tên không được để trống!")
+                elif new_f_name.strip() in st.session_state.members:
+                    st.error("Tên người này đã có trong danh bạ!")
+                else:
+                    st.session_state.members[new_f_name.strip()] = {"bank": new_f_bank, "acc": new_f_acc.strip()}
+                    save_data()
+                    st.toast(f"Đã thêm {new_f_name} vào danh bạ!", icon="🎉")
+                    st.rerun()
+
+    with col_list_friend:
+        st.markdown("#### 📜 Danh sách đã lưu")
+        # Chỉ lấy danh sách bạn bè (loại trừ chính mình)
+        friends = [m for m in st.session_state.members.keys() if m != nickname]
+        
+        if not friends:
+            st.info("Chưa có ai trong danh bạ. Hãy thêm bạn bè ở bên cạnh nhé!")
+        else:
+            for f_name in friends:
+                with st.expander(f"👤 {f_name}"):
+                    fc1, fc2 = st.columns(2)
+                    f_bank_saved = st.session_state.members[f_name].get('bank', '')
+                    f_idx = bank_list.index(f_bank_saved) if f_bank_saved in bank_list else 0
+                    
+                    edit_f_bank = fc1.selectbox("Ngân hàng:", bank_list, index=f_idx, key=f"edit_bank_{f_name}")
+                    edit_f_acc = fc2.text_input("Số tài khoản:", value=st.session_state.members[f_name].get('acc', ''), key=f"edit_acc_{f_name}")
+                    
+                    bc1, bc2 = st.columns(2)
+                    if bc1.button("💾 Lưu thay đổi", key=f"save_btn_{f_name}", use_container_width=True):
+                        st.session_state.members[f_name] = {"bank": edit_f_bank, "acc": edit_f_acc}
+                        save_data()
+                        st.toast(f"Đã cập nhật thông tin của {f_name}!", icon="✅")
+                        st.rerun()
+                        
+                    if bc2.button("🗑️ Xóa bạn", key=f"del_btn_{f_name}", use_container_width=True):
+                        st.session_state.members.pop(f_name)
+                        save_data()
+                        st.toast(f"Đã xóa {f_name} khỏi danh bạ!", icon="🗑️")
+                        st.rerun()
+
+    st.write("---")
+
+    # --- PHẦN 3: NHÓM ĐI CHƠI ---
+    st.markdown("### 🧑‍🤝‍🧑 Quản lý Nhóm đi chơi")
+    col_add_group, col_list_group = st.columns([1, 1.5], gap="large")
+
+    all_members_list = list(st.session_state.members.keys())
+
+    with col_add_group:
+        st.markdown("#### ➕ Tạo nhóm mới")
+        with st.container(border=True):
+            new_g_name = st.text_input("Tên nhóm:", placeholder="Ví dụ: Nhóm Trà Sữa...")
+            # Mặc định luôn tick sẵn tên của bản thân vào nhóm
+            new_g_members = st.multiselect("Chọn thành viên:", all_members_list, default=[nickname], key="new_g_members")
+            
+            if st.button("➕ Lập nhóm", use_container_width=True):
+                if not new_g_name.strip():
+                    st.warning("Vui lòng đặt tên cho nhóm!")
+                elif len(new_g_members) < 2:
+                    st.warning("Một nhóm phải có ít nhất 2 người!")
+                elif new_g_name.strip() in st.session_state.groups:
+                    st.error("Tên nhóm này đã tồn tại!")
+                else:
+                    st.session_state.groups[new_g_name.strip()] = new_g_members
+                    save_data()
+                    st.toast(f"Đã tạo nhóm {new_g_name} thành công!", icon="🎉")
+                    st.rerun()
+
+    with col_list_group:
+        st.markdown("#### 📌 Danh sách các nhóm")
+        if not st.session_state.groups:
+            st.info("Bạn chưa có hội nhóm nào.")
+        else:
+            # Dùng list() để tránh lỗi RuntimeError khi dictionary bị thay đổi kích thước trong lúc lặp
+            for g_name, g_members in list(st.session_state.groups.items()):
+                with st.expander(f"📌 Nhóm: {g_name} ({len(g_members)} thành viên)"):
+                    # Lọc ra những thành viên hợp lệ (nhỡ may bạn đã xóa ai đó khỏi danh bạ ở trên)
+                    valid_members = [m for m in g_members if m in all_members_list]
+                    edit_g_members = st.multiselect("Chỉnh sửa thành viên:", all_members_list, default=valid_members, key=f"edit_g_{g_name}")
+                    
+                    gc1, gc2 = st.columns(2)
+                    if gc1.button("💾 Lưu thay đổi", key=f"save_g_{g_name}", use_container_width=True):
+                        if len(edit_g_members) < 2:
+                            st.error("Nhóm không thể ít hơn 2 người!")
+                        else:
+                            st.session_state.groups[g_name] = edit_g_members
+                            save_data()
+                            st.toast(f"Đã cập nhật nhóm {g_name}!", icon="✅")
+                            st.rerun()
+                            
+                    if gc2.button("🗑️ Xóa nhóm", key=f"del_g_{g_name}", use_container_width=True):
+                        st.session_state.groups.pop(g_name)
+                        save_data()
+                        st.toast(f"Đã giải tán nhóm {g_name}!", icon="🧨")
+                        st.rerun()
 # --- TAB 2: GHI HÓA ĐƠN ---
 with tab2:
     if 'current_items' not in st.session_state: st.session_state.current_items = []
