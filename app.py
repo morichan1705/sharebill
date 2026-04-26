@@ -160,7 +160,7 @@ with tab2:
             try:
                 img = PIL.Image.open(up_f); img.thumbnail((800, 800))
                 prompt_img = f"Hôm nay là {current_time_str}. Đọc bill, tìm ngày giờ hóa đơn. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL"
-                res = client.models.generate_content(model='gemini-2.0-flash', contents=[prompt_img, img])
+                res = client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_img, img])
                 
                 for line in res.text.strip().split('\n'):
                     line = line.strip()
@@ -177,7 +177,7 @@ with tab2:
         if txt_ai and st.button("✨ Phân tích chữ"):
             try:
                 prompt_txt = f"Hôm nay là {current_time_str}. Đọc tin nhắn, tự suy luận ngày giờ đi ăn (nếu nói 'hôm qua', 'tối nay'). Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
-                res = client.models.generate_content(model='gemini-2.0-flash', contents=prompt_txt)
+                res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt_txt)
                 
                 for line in res.text.strip().split('\n'):
                     line = line.strip()
