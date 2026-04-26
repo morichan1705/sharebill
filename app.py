@@ -180,7 +180,7 @@ with tab1:
                 else:
                     st.session_state.members[new_f_name.strip()] = {"bank": new_f_bank, "acc": new_f_acc.strip()}
                     save_data()
-                    st.success(f"Đã thêm {new_f_name} vào danh bạ!")
+                    st.success("Đã thêm {new_f_name} vào danh bạ!")
                     st.rerun()
 
     with col_list_friend:
@@ -204,13 +204,13 @@ with tab1:
                     if bc1.button("💾 Lưu thay đổi", key=f"save_btn_{f_name}", use_container_width=True):
                         st.session_state.members[f_name] = {"bank": edit_f_bank, "acc": edit_f_acc}
                         save_data()
-                        st.success(f"Đã cập nhật thông tin của {f_name}!")
+                        st.success("Đã cập nhật thông tin của {f_name}!")
                         st.rerun()
                         
                     if bc2.button("🗑️ Xóa bạn", key=f"del_btn_{f_name}", use_container_width=True):
                         st.session_state.members.pop(f_name)
                         save_data()
-                        st.success(f"Đã xóa {f_name} khỏi danh bạ!")
+                        st.success("Đã xóa {f_name} khỏi danh bạ!")
                         st.rerun()
 
     st.write("---")
