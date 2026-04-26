@@ -537,10 +537,7 @@ with tab4:
                     st.write(f"- {p}: {format_vn(amt)}đ ({status})")
 
 # --- TAB 5: WRAPPED & BẢNG XẾP HẠNG NHÓM ---
-with tab5:
-    # Mỗi lần mở Tab 5 là bóng bay ngập trời
-    st.balloons() 
-    st.markdown("<h2 style='text-align: center; color: #ff4b4b;'>🎉 Sòng Phẳng Wrapped</h2>", unsafe_allow_html=True)
+with tab5:
     # ... (code cũ giữ nguyên)
     if not st.session_state.history:
         st.info("Chưa có dữ liệu đi chơi. Hãy lập kèo đi ăn ngay để mở khóa thống kê!")
