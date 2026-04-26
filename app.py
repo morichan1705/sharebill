@@ -140,13 +140,29 @@ with tab1:
     if my_nick not in st.session_state.members:
         st.session_state.members[my_nick] = {"bank": "", "acc": ""}
 
-    with st.expander("💳 Cài đặt tài khoản ngân hàng của bạn (Để người khác quét mã)"):
+   with st.expander("Sửa thông tin nhận tiền của bạn (Để người khác quét QR)"):
+        # Chia làm 2 cột cho UI gọn gàng, đẹp mắt
         c1, c2 = st.columns(2)
-        my_bank = c1.selectbox("Ngân hàng:", ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG"][my_nick]['bank'])
-        my_acc = c2.text_input("Số tài khoản:", value=st.session_state.members[my_nick]['acc'])
-        if st.button("Cập nhật thông tin cá nhân"):
-            st.session_state.members[my_nick] = {"bank": my_bank, "acc": my_acc}
-            save_data(); st.toast("Đã lưu thông tin cá nhân!"); st.rerun()
+        
+        # 1. Danh sách các ngân hàng phổ biến
+        bank_list = ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG", "ACB", "SHB", "STB", "VIB"]
+        
+        # 2. Lấy dữ liệu cũ một cách an toàn bằng hàm .get()
+        saved_bank = st.session_state.members[nickname].get('bank', '')
+        saved_acc = st.session_state.members[nickname].get('acc', '')
+        
+        # 3. Tìm vị trí của ngân hàng cũ. Nếu chưa có hoặc nhập sai thì để mặc định là 0 (ô trống)
+        default_idx = bank_list.index(saved_bank) if saved_bank in bank_list else 0
+        
+        # 4. Gắn vào Selectbox và Text_input
+        my_bank = c1.selectbox("Ngân hàng:", bank_list, index=default_idx)
+        my_acc = c2.text_input("Số tài khoản:", value=saved_acc)
+        
+        if st.button("Cập nhật thông tin bản thân"):
+            st.session_state.members[nickname] = {"bank": my_bank, "acc": my_acc}
+            save_data()
+            st.toast("Đã cập nhật số tài khoản thành công!", icon="✅")
+            st.rerun()
     
     st.write("---")
     st.markdown("### 👥 Quản lý Bạn bè & Nhóm")
