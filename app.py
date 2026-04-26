@@ -142,7 +142,7 @@ with tab1:
 
     with st.expander("💳 Cài đặt tài khoản ngân hàng của bạn (Để người khác quét mã)"):
         c1, c2 = st.columns(2)
-        my_bank = c1.text_input("Ngân hàng:", value=st.session_state.members[my_nick]['bank'])
+        my_bank = c1.selectbox("Ngân hàng:", ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG"][my_nick]['bank'])
         my_acc = c2.text_input("Số tài khoản:", value=st.session_state.members[my_nick]['acc'])
         if st.button("Cập nhật thông tin cá nhân"):
             st.session_state.members[my_nick] = {"bank": my_bank, "acc": my_acc}
@@ -156,7 +156,8 @@ with tab1:
         st.subheader("👤 Thành Viên")
         n_name = st.text_input("Tên mới:")
         n_bank = st.selectbox("Ngân hàng:", ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG"])
-        n_acc = st.text_input("Số tài khoản:")
+        # Thêm thuộc tính key=f"acc_{name}" (hoặc biến tên tương ứng trong vòng lặp của bạn)
+        n_acc = st.text_input("Số tài khoản:", value=info['acc'], key=f"acc_input_{name}")
         if st.button("➕ Lưu người mới"):
             if n_name: st.session_state.members[n_name] = {"bank": n_bank, "acc": n_acc}; save_data(); st.rerun()
         
