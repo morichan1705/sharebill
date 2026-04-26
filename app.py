@@ -290,37 +290,38 @@ with tab2:
 
 # --- TAB 3: CHỐT SỔ (Bù trừ nợ chéo & Có Deadline) ---
 with tab3:
-    # --- TRUNG TÂM NHẮC NỢ (URGENT REMINDERS) ---
-today = datetime.now().date()
-urgent_alerts = []
+    # 1. TRUNG TÂM NHẮC NỢ
+    today = datetime.now().date()
+    urgent_alerts = []
 
-# Duyệt qua lịch sử để tìm các khoản nợ sắp đến hạn (trong vòng 3 ngày tới)
-for b in st.session_state.history:
-    if b['status'] == 'unpaid' and b.get('deadline'):
-        dl_date = datetime.strptime(b['deadline'], "%d/%m/%Y").date()
-        days_left = (dl_date - today).days
-        
-        # Lọc các bill còn từ 0 đến 3 ngày
-        if 0 <= days_left <= 3:
-            urgent_alerts.append({
-                "name": b['name'],
-                "days": days_left,
-                "deadline": b['deadline'],
-                "payer": b['payer'],
-                "amount": b['amount']
-            })
+    for b in st.session_state.history:
+        if b['status'] == 'unpaid' and b.get('deadline'):
+            try:
+                dl_date = datetime.strptime(b['deadline'], "%d/%m/%Y").date()
+                days_left = (dl_date - today).days
+                
+                if 0 <= days_left <= 3:
+                    urgent_alerts.append({
+                        "name": b['name'],
+                        "days": days_left,
+                        "deadline": b['deadline'],
+                        "payer": b['payer'],
+                        "amount": b['amount']
+                    })
+            except Exception as e:
+                pass # Bỏ qua nếu lỗi định dạng ngày
 
-# Hiển thị thông báo nếu có bill sắp đến hạn
-if urgent_alerts:
-    st.markdown("### 🔔 Nhắc nhở hạn chót")
-    for alert in urgent_alerts:
-        msg = f"Sắp tới hạn! Bill **{alert['name']}** ({format_vn(alert['amount'])}đ) "
-        if alert['days'] == 0:
-            st.error(f"🚨 {msg} phải trả vào **HÔM NAY**!")
-        else:
-            st.warning(f"⏰ {msg} còn **{alert['days']} ngày** nữa (Hạn: {alert['deadline']})")
-    st.write("---")
-    
+    if urgent_alerts:
+        st.markdown("### 🔔 Nhắc nhở hạn chót")
+        for alert in urgent_alerts:
+            msg = f"Sắp tới hạn! Bill **{alert['name']}** ({format_vn(alert['amount'])}đ) "
+            if alert['days'] == 0:
+                st.error(f"🚨 {msg} phải trả vào **HÔM NAY**!")
+            else:
+                st.warning(f"⏰ {msg} còn **{alert['days']} ngày** nữa (Hạn: {alert['deadline']})")
+        st.write("---")
+
+    # 2. XỬ LÝ DANH SÁCH NỢ (Đoạn code cũ của bạn bắt đầu từ đây)
     unpaid = [b for b in st.session_state.history if b['status'] == 'unpaid']
     if not unpaid:
         st.success("Tất cả hóa đơn đã thanh toán xong! 🎉")
