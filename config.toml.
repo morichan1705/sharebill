@@ -1,0 +1,15 @@
+[theme]
+# Màu chủ đạo (Nút bấm, thanh kéo...)
+primaryColor = "#FF4B4B"
+
+# Màu nền chính của trang
+backgroundColor = "#FFFFFF"
+
+# Màu nền phụ (Sidebar, các ô expander)
+secondaryBackgroundColor = "#F4F6F9"
+
+# Màu chữ
+textColor = "#1E1E1E"
+
+# Font chữ hiện đại, tròn trịa
+font = "sans serif"
