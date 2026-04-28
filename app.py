@@ -258,7 +258,7 @@ with tab2:
     st.subheader("📝 Ghi hóa đơn mới")
     if 'current_items' not in st.session_state: st.session_state.current_items = []
    
-st.subheader("🤖 AI giúp bạn ghi hoá đơn nhanh")
+    st.subheader("🤖 AI giúp bạn ghi hoá đơn nhanh")
     c_ai1, c_ai2 = st.columns(2)
     
     # Ép giờ hệ thống về GMT+7 (Giờ Việt Nam)
