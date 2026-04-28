@@ -258,41 +258,58 @@ with tab2:
     st.subheader("📝 Ghi hóa đơn mới")
     if 'current_items' not in st.session_state: st.session_state.current_items = []
    
-    st.subheader("🤖 Nhập liệu nhanh AI")
+st.subheader("🤖 AI giúp bạn ghi hoá đơn nhanh")
     c_ai1, c_ai2 = st.columns(2)
-    current_time_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+    
+    # Ép giờ hệ thống về GMT+7 (Giờ Việt Nam)
+    gmt7 = timezone(timedelta(hours=7))
+    current_time_str = datetime.now(gmt7).strftime('%d/%m/%Y %H:%M')
     
     with c_ai1:
-        up_f = st.file_uploader("📸 Nhập ảnh của bạn ở đây", type=["jpg", "png", "jpeg"])
-        if up_f and st.button("✨ Phân tích ảnh"):
+        # Thêm accept_multiple_files=True để cho phép chọn nhiều ảnh cùng lúc
+        up_files = st.file_uploader("📸 Nhập bill ở đây (Có thể chọn nhiều ảnh)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        if up_files and st.button("✨ Phân tích tất cả ảnh"):
             try:
-                img = PIL.Image.open(up_f); img.thumbnail((800, 800))
-                prompt_img = f"Hôm nay là {current_time_str}. Đọc bill, tìm ngày giờ hóa đơn. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL"
-                res = client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_img, img])
+                images = []
+                for f in up_files:
+                    img = PIL.Image.open(f)
+                    img.thumbnail((800, 800))
+                    images.append(img)
+                
+                # Cập nhật Prompt để AI gộp chung nhiều bill lại thành 1 list
+                prompt_img = f"Hôm nay là {current_time_str} (Giờ Việt Nam). Đọc TẤT CẢ các bill trong các ảnh được cung cấp. Gộp chung tất cả các món ăn lại thành một danh sách duy nhất. Tìm ngày giờ hóa đơn (lấy ngày giờ của bill đầu tiên hoặc rõ ràng nhất). Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL"
+                
+                # Gửi toàn bộ prompt và danh sách ảnh cho AI
+                res = client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_img] + images)
+                
                 for line in res.text.strip().split('\n'):
                     line = line.strip()
-                    if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
+                    if line.upper().startswith("NGÀY:"): 
+                        st.session_state.ai_date = line[5:].strip()
                     else:
                         p = line.split('|')
                         if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
                 st.rerun()
-            except Exception as e: st.error(e)
+            except Exception as e: 
+                st.error(e)
             
     with c_ai2:
         txt_ai = st.text_area("💬 Dán tin nhắn của bạn ở đây:")
         if txt_ai and st.button("✨ Phân tích chữ"):
             try:
-                prompt_txt = f"Hôm nay là {current_time_str}. Đọc tin nhắn, tự suy luận ngày giờ đi ăn. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
+                prompt_txt = f"Hôm nay là {current_time_str} (Giờ Việt Nam). Đọc tin nhắn, tự suy luận ngày giờ đi ăn. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
                 res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt_txt)
                 for line in res.text.strip().split('\n'):
                     line = line.strip()
-                    if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
+                    if line.upper().startswith("NGÀY:"): 
+                        st.session_state.ai_date = line[5:].strip()
                     else:
                         p = line.split('|')
                         if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
                 st.rerun()
-            except Exception as e: st.error(e)
-
+            except Exception as e: 
+                st.error(e)
+                
     st.divider()
     st.subheader("📝 Nhập món lẻ (tuỳ chọn)")
     i_c1, i_c2, i_c3, i_c4 = st.columns([4, 3, 2, 2])
