@@ -301,7 +301,7 @@ with tab2:
     gmt7 = timezone(timedelta(hours=7))
     current_time_str = datetime.now(gmt7).strftime('%d/%m/%Y %H:%M')
     
-with c_ai1:
+    with c_ai1:
         up_files = st.file_uploader("📸 Nhập bill ở đây", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
         if up_files and st.button("✨ Phân tích tất cả ảnh", type="primary"):
             # THÊM SPINNER Ở ĐÂY
