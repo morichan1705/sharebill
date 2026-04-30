@@ -44,12 +44,13 @@ def get_user_from_db(username):
     res = supabase.table("users").select("*").eq("username", username).execute()
     return res.data[0] if res.data else None
 
+# GIAO DIỆN ĐĂNG NHẬP
 if not st.session_state.logged_in:
     st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Share Bills</h1>", unsafe_allow_html=True)
     tab_login, tab_reg = st.tabs(["Đăng nhập", "Đăng ký"])
     with tab_login:
-        l_user = st.text_input("Tài khoản:")
-        l_pass = st.text_input("Mật khẩu:", type="password")
+        l_user = st.text_input("Tài khoản:", key="log_user")
+        l_pass = st.text_input("Mật khẩu:", type="password", key="log_pass")
         if st.button("🚀 Đăng nhập", type="primary", use_container_width=True):
             user_data = get_user_from_db(l_user)
             if user_data and l_pass == user_data["password"]:
@@ -57,9 +58,9 @@ if not st.session_state.logged_in:
                 st.rerun()
             else: st.error("Sai tài khoản hoặc mật khẩu!")
     with tab_reg:
-        r_user = st.text_input("Tên đăng nhập (ID):")
-        r_pass = st.text_input("Mật khẩu:", type="password")
-        r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Mori)")
+        r_user = st.text_input("Tên đăng nhập (ID):", key="reg_user")
+        r_pass = st.text_input("Mật khẩu:", type="password", key="reg_pass")
+        r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Mori)", key="reg_nick")
         if st.button("📝 Đăng ký tài khoản", use_container_width=True):
             if get_user_from_db(r_user): st.error("ID này đã tồn tại!")
             elif r_user and r_pass and r_nick:
@@ -70,7 +71,6 @@ if not st.session_state.logged_in:
                 st.success("Đăng ký thành công! Mời bạn qua tab Đăng nhập.")
             else: st.warning("Vui lòng điền đủ thông tin!")
     st.stop()
-
 # --- 3. DỮ LIỆU CÁ NHÂN HÓA (V7 - FIX IDENTITY BUG) ---
 st.sidebar.markdown(f"### ✨ Xin chào, **{st.session_state.get('nickname', 'Bạn')}**!")
 if st.sidebar.button("🚪 Đăng xuất"):
