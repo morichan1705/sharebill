@@ -243,7 +243,19 @@ with tab1:
         st.markdown("#### 📌 Danh sách nhóm")
         if not st.session_state.groups: st.info("Chưa có hội nhóm nào.")
         else:
-            for g_name, g_members in list(st.session_state.groups.items()):
+            # --- TÍCH HỢP PHÂN TRANG NHÓM ---
+            group_names = list(st.session_state.groups.keys())
+            if 'group_page' not in st.session_state: st.session_state.group_page = 1
+            per_page_g = 5
+            total_pages_g = max(1, math.ceil(len(group_names) / per_page_g))
+            
+            if st.session_state.group_page > total_pages_g: 
+                st.session_state.group_page = total_pages_g
+                
+            start_idx_g = (st.session_state.group_page - 1) * per_page_g
+            
+            for g_name in group_names[start_idx_g : start_idx_g + per_page_g]:
+                g_members = st.session_state.groups[g_name]
                 with st.expander(f"📌 {g_name} ({len(g_members)} thành viên)"):
                     edit_g_members = st.multiselect("Thành viên:", all_mem_ids, default=[m for m in g_members if m in all_mem_ids], format_func=get_name, key=f"eg_{g_name}")
                     gc1, gc2 = st.columns(2)
@@ -251,6 +263,14 @@ with tab1:
                         st.session_state.groups[g_name] = edit_g_members; save_data(); st.rerun()
                     if gc2.button("🗑️ Xóa nhóm", key=f"dg_{g_name}", type="primary", use_container_width=True):
                         st.session_state.groups.pop(g_name); save_data(); st.rerun()
+
+            if total_pages_g > 1:
+                gp1, gp2, gp3 = st.columns([1, 2, 1])
+                if gp1.button("⬅️ Trước", key="g_prev", disabled=(st.session_state.group_page == 1)): 
+                    st.session_state.group_page -= 1; st.rerun()
+                gp2.markdown(f"<div style='text-align: center; margin-top: 10px;'>{st.session_state.group_page} / {total_pages_g}</div>", unsafe_allow_html=True)
+                if gp3.button("Sau ➡️", key="g_next", disabled=(st.session_state.group_page == total_pages_g)): 
+                    st.session_state.group_page += 1; st.rerun()
 
 # --- TAB 2: GHI HÓA ĐƠN ---
 with tab2:
