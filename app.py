@@ -428,6 +428,20 @@ with tab3:
         
         if not use_netting:
             st.markdown("### 📜 Danh sách nợ chi tiết (Không bù trừ)")
+            
+            # +++ BẮT ĐẦU PHẦN THÊM MỚI: TẠO NÚT COPY KHI KHÔNG BÙ TRỪ +++
+            msg_out_raw = "📣 TỔNG KẾT CHỐT SỔ NỢ (KHÔNG BÙ TRỪ):\n"
+            if debts_dict:
+                for (d_raw, c_raw), items_raw in debts_dict.items():
+                    total_owed_raw = sum(item['amount'] for item in items_raw)
+                    msg_out_raw += f"🔸 {get_pure_name(d_raw)} nợ {get_pure_name(c_raw)}: {format_vn(total_owed_raw)}đ\n"
+                
+                with st.expander("📋 Copy tin nhắn gửi nhóm (Không bù trừ)"):
+                    st.code(msg_out_raw, language="text")
+                st.write("---")
+            # +++ KẾT THÚC PHẦN THÊM MỚI +++
+
+            # Đoạn code hiển thị UI cũ của bạn giữ nguyên:
             for (debtor, creditor), items in debts_dict.items():
                 total_owed = sum(item['amount'] for item in items)
                 with st.expander(f"🔴 **{get_pure_name(debtor)}** nợ **{get_pure_name(creditor)}**: {format_vn(total_owed)}đ"):
@@ -449,6 +463,7 @@ with tab3:
                                     if c not in b['paid_by']: t_bals[c] = t_bals.get(c, 0) - a
                                 if not any(v < -1 for v in t_bals.values()): b['status'] = 'paid'
                         save_data(); st.rerun()
+                    
         else:
             net_bal = {m: 0 for m in st.session_state.members}
             for d in matrix:
