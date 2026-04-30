@@ -1,15 +1,50 @@
 import streamlit as st
 import json
-import os
-import re
+import math
 import time
+import re
 from datetime import datetime, timedelta, timezone
 from google import genai
-from supabase import create_client
 import PIL.Image
+from supabase import create_client
+import pandas as pd
 
-# --- 1. CÀI ĐẶT TRANG CƠ BẢN ---
+# --- 1. CÀI ĐẶT TRANG CƠ BẢN & GIAO DIỆN ---
 st.set_page_config(page_title="Share Bills Super Ultimate", page_icon="💸", layout="wide")
+
+# CSS TUỲ CHỈNH: Đổi màu nền, màu ô nhập liệu, ẩn "Enter to apply" và đổi màu nút đỏ
+st.markdown("""
+<style>
+    /* Đổi màu nền toàn trang */
+    .stApp {
+        background-color: #FFEDCE !important;
+    }
+    
+    /* Đổi màu các ô nhập liệu (input, select, textarea) */
+    div[data-baseweb="input"] > div, 
+    div[data-baseweb="select"] > div, 
+    div[data-baseweb="textarea"] > div,
+    input[type="number"] {
+        background-color: #FFC193 !important;
+        border: 1px solid #ffa559 !important;
+    }
+
+    /* Ẩn dòng chữ "Press Enter to apply" mặc định của Streamlit */
+    div[data-testid="InputInstructions"] {
+        display: none !important;
+    }
+
+    /* Đổi màu các nút bấm có type="primary" thành màu Đỏ */
+    button[kind="primary"] {
+        background-color: #ff4b4b !important;
+        border-color: #ff4b4b !important;
+        color: white !important;
+    }
+    button[kind="primary"]:hover {
+        background-color: #e03e3e !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Lấy Key từ Secrets
 try:
@@ -27,18 +62,17 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- 2. HỆ THỐNG ĐĂNG NHẬP / ĐĂNG KÝ (LƯU TRÊN CLOUD) ---
+# --- 2. HỆ THỐNG ĐĂNG NHẬP / ĐĂNG KÝ (SUPABASE) ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ''
     st.session_state.nickname = ''
 
-# Hàm hỗ trợ lấy thông tin user từ Supabase
 def get_user_from_db(username):
     res = supabase.table("users").select("*").eq("username", username).execute()
     return res.data[0] if res.data else None
 
-# GIAO DIỆN ĐĂNG NHẬP (Chỉ hiện khi chưa login)
+# GIAO DIỆN ĐĂNG NHẬP
 if not st.session_state.logged_in:
     st.markdown("<h1 style='text-align: center;'>🔐 Đăng nhập Share Bills</h1>", unsafe_allow_html=True)
     tab_login, tab_reg = st.tabs(["Đăng nhập", "Đăng ký"])
@@ -62,13 +96,12 @@ if not st.session_state.logged_in:
     with tab_reg:
         r_user = st.text_input("Tên đăng nhập (ID):", key="reg_id")
         r_pass = st.text_input("Mật khẩu:", type="password", key="reg_pass")
-        r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Trúc Lâm)", key="reg_nick")
+        r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Mori)", key="reg_nick")
         
         if st.button("📝 Đăng ký tài khoản", use_container_width=True):
             if get_user_from_db(r_user): 
                 st.error("ID này đã tồn tại!")
             elif r_user and r_pass and r_nick:
-                # Lưu thẳng user mới lên database
                 supabase.table("users").insert({
                     "username": r_user,
                     "password": r_pass,
@@ -79,10 +112,9 @@ if not st.session_state.logged_in:
             else: 
                 st.warning("Vui lòng điền đủ 3 thông tin!")
                 
-    st.stop() # Chặn web nếu chưa login
+    st.stop() 
 
-# --- 3. CHUẨN BỊ DỮ LIỆU CÁ NHÂN HÓA (Chạy sau khi đã login) ---
-# Sidebar - Hiển thị Nickname
+# --- 3. CHUẨN BỊ DỮ LIỆU CÁ NHÂN HÓA (SUPABASE) ---
 st.sidebar.markdown(f"### ✨ Xin chào, **{st.session_state.get('nickname', 'Bạn')}**!")
 if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.logged_in = False
@@ -90,7 +122,6 @@ if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.nickname = ''
     st.rerun()
 
-# Kéo dữ liệu TỪ SUPABASE VỀ SESSION STATE
 def load_data():
     user_data = get_user_from_db(st.session_state.username)
     if user_data and user_data.get('app_data'):
@@ -101,7 +132,6 @@ def load_data():
     else:
         st.session_state.members, st.session_state.groups, st.session_state.history = {}, {}, []
 
-# Đẩy dữ liệu TỪ SESSION STATE LÊN SUPABASE
 def save_data():
     new_app_data = {
         'members': st.session_state.members, 
@@ -110,11 +140,9 @@ def save_data():
     }
     supabase.table("users").update({"app_data": new_app_data}).eq("username", st.session_state.username).execute()
 
-# Khởi tạo data lần đầu khi mới đăng nhập xong
-if 'members' not in st.session_state: 
-    load_data()
-    
-# --- 2. HÀM BỔ TRỢ ---
+if 'members' not in st.session_state: load_data()
+
+# Hàm bổ trợ
 def parse_amount(text):
     if not text: return 0
     clean = str(text).lower().replace(',', '').replace('.', '').replace(' ', '')
@@ -145,7 +173,7 @@ with tab1:
 
     bank_list = ["", "MB", "VCB", "TPB", "BIDV", "TCB", "VPB", "CTG", "ACB", "SHB", "STB", "VIB"]
 
-    with st.expander("⚙️ Sửa thông tin nhận tiền của bạn (Để người khác quét QR)"):
+    with st.expander("⚙️ Sửa thông tin nhận tiền của bạn"):
         c1, c2 = st.columns(2)
         saved_bank = st.session_state.members[nickname].get('bank', '')
         saved_acc = st.session_state.members[nickname].get('acc', '')
@@ -154,10 +182,10 @@ with tab1:
         my_bank = c1.selectbox("Ngân hàng:", bank_list, index=default_idx, key="my_bank_select")
         my_acc = c2.text_input("Số tài khoản:", value=saved_acc, key="my_acc_input")
         
-        if st.button("💾 Cập nhật thông tin bản thân", type="primary"):
+        if st.button("💾 Cập nhật", type="primary"):
             st.session_state.members[nickname] = {"bank": my_bank, "acc": my_acc}
             save_data()
-            st.toast("Đã cập nhật số tài khoản thành công!", icon="✅")
+            st.toast("Đã cập nhật số tài khoản!", icon="✅")
             st.rerun()
 
     st.write("---")
@@ -171,24 +199,35 @@ with tab1:
             new_f_bank = st.selectbox("Ngân hàng (Tùy chọn):", bank_list, key="new_f_bank")
             new_f_acc = st.text_input("Số tài khoản (Tùy chọn):", key="new_f_acc")
             
-            if st.button("➕ Thêm người này", use_container_width=True):
-                if not new_f_name.strip():
-                    st.warning("Tên không được để trống!")
-                elif new_f_name.strip() in st.session_state.members:
-                    st.error("Tên người này đã có trong danh bạ!")
+            if st.button("➕ Thêm người này", type="primary", use_container_width=True):
+                if not new_f_name.strip(): st.warning("Tên không được để trống!")
+                elif new_f_name.strip() in st.session_state.members: st.error("Tên người này đã có trong danh bạ!")
                 else:
                     st.session_state.members[new_f_name.strip()] = {"bank": new_f_bank, "acc": new_f_acc.strip()}
                     save_data()
-                    st.toast(f"Đã thêm {new_f_name} vào danh bạ!", icon="🎉")
+                    st.toast(f"Đã thêm {new_f_name}!", icon="🎉")
                     st.rerun()
 
     with col_list_friend:
         st.markdown("#### 📜 Danh sách đã lưu")
         friends = [m for m in st.session_state.members.keys() if m != nickname]
+        
         if not friends:
             st.info("Chưa có ai trong danh bạ. Hãy thêm bạn bè ở bên cạnh nhé!")
         else:
-            for f_name in friends:
+            if 'friend_page' not in st.session_state:
+                st.session_state.friend_page = 1
+            
+            per_page = 6
+            total_pages = max(1, math.ceil(len(friends) / per_page))
+            
+            if st.session_state.friend_page > total_pages: st.session_state.friend_page = total_pages
+            if st.session_state.friend_page < 1: st.session_state.friend_page = 1
+            
+            start_idx = (st.session_state.friend_page - 1) * per_page
+            end_idx = start_idx + per_page
+            
+            for f_name in friends[start_idx:end_idx]:
                 with st.expander(f"👤 {f_name}"):
                     fc1, fc2 = st.columns(2)
                     f_bank_saved = st.session_state.members[f_name].get('bank', '')
@@ -198,16 +237,29 @@ with tab1:
                     edit_f_acc = fc2.text_input("Số tài khoản:", value=st.session_state.members[f_name].get('acc', ''), key=f"edit_acc_{f_name}")
                     
                     bc1, bc2 = st.columns(2)
-                    if bc1.button("💾 Lưu thay đổi", key=f"save_btn_{f_name}", use_container_width=True):
+                    if bc1.button("💾 Lưu", key=f"save_btn_{f_name}", use_container_width=True):
                         st.session_state.members[f_name] = {"bank": edit_f_bank, "acc": edit_f_acc}
                         save_data()
-                        st.toast(f"Đã cập nhật thông tin của {f_name}!", icon="✅")
+                        st.toast(f"Đã cập nhật {f_name}!", icon="✅")
                         st.rerun()
-                    if bc2.button("🗑️ Xóa bạn", key=f"del_btn_{f_name}", use_container_width=True):
+                    if bc2.button("🗑️ Xóa bạn", key=f"del_btn_{f_name}", type="primary", use_container_width=True):
                         st.session_state.members.pop(f_name)
+                        for g_name in list(st.session_state.groups.keys()):
+                            if f_name in st.session_state.groups[g_name]:
+                                st.session_state.groups[g_name].remove(f_name)
                         save_data()
-                        st.toast(f"Đã xóa {f_name} khỏi danh bạ!", icon="🗑️")
+                        st.toast(f"Đã xóa {f_name}!", icon="🗑️")
                         st.rerun()
+            
+            if total_pages > 1:
+                cp1, cp2, cp3 = st.columns([1, 2, 1])
+                if cp1.button("⬅️ Trước", disabled=(st.session_state.friend_page == 1), use_container_width=True):
+                    st.session_state.friend_page -= 1
+                    st.rerun()
+                cp2.markdown(f"<div style='text-align: center; margin-top: 10px; font-weight: bold;'>{st.session_state.friend_page} of {total_pages}</div>", unsafe_allow_html=True)
+                if cp3.button("Sau ➡️", disabled=(st.session_state.friend_page == total_pages), use_container_width=True):
+                    st.session_state.friend_page += 1
+                    st.rerun()
 
     st.write("---")
     st.markdown("### 🧑‍🤝‍🧑 Quản lý Nhóm đi chơi")
@@ -218,21 +270,15 @@ with tab1:
         st.markdown("#### ➕ Tạo nhóm mới")
         with st.container(border=True):
             new_g_name = st.text_input("Tên nhóm:", placeholder="Ví dụ: Nhóm Trà Sữa...")
-            new_g_members = st.multiselect(
-                "Chọn thành viên:", 
-                all_members_list, 
-                default=[nickname], 
-                format_func=lambda x: f"Bản thân ({x})" if x == nickname else x,
-                key="new_g_members"
-            )
-            if st.button("➕ Lập nhóm", use_container_width=True):
+            new_g_members = st.multiselect("Chọn thành viên:", all_members_list, default=[nickname], format_func=lambda x: f"Bản thân ({x})" if x == nickname else x, key="new_g_members")
+            if st.button("➕ Lập nhóm", type="primary", use_container_width=True):
                 if not new_g_name.strip(): st.warning("Vui lòng đặt tên cho nhóm!")
                 elif len(new_g_members) < 2: st.warning("Một nhóm phải có ít nhất 2 người!")
                 elif new_g_name.strip() in st.session_state.groups: st.error("Tên nhóm này đã tồn tại!")
                 else:
                     st.session_state.groups[new_g_name.strip()] = new_g_members
                     save_data()
-                    st.toast(f"Đã tạo nhóm {new_g_name} thành công!", icon="🎉")
+                    st.toast(f"Đã tạo nhóm {new_g_name}!", icon="🎉")
                     st.rerun()
 
     with col_list_group:
@@ -243,25 +289,17 @@ with tab1:
             for g_name, g_members in list(st.session_state.groups.items()):
                 with st.expander(f"📌 Nhóm: {g_name} ({len(g_members)} thành viên)"):
                     valid_members = [m for m in g_members if m in all_members_list]
-                    edit_g_members = st.multiselect(
-                        "Chỉnh sửa thành viên:", 
-                        all_members_list, 
-                        default=valid_members, 
-                        format_func=lambda x: f"Bản thân ({x})" if x == nickname else x,
-                        key=f"edit_g_{g_name}"
-                    )
+                    edit_g_members = st.multiselect("Chỉnh sửa thành viên:", all_members_list, default=valid_members, format_func=lambda x: f"Bản thân ({x})" if x == nickname else x, key=f"edit_g_{g_name}")
                     gc1, gc2 = st.columns(2)
-                    if gc1.button("💾 Lưu thay đổi", key=f"save_g_{g_name}", use_container_width=True):
+                    if gc1.button("💾 Lưu", key=f"save_g_{g_name}", use_container_width=True):
                         if len(edit_g_members) < 2: st.error("Nhóm không thể ít hơn 2 người!")
                         else:
                             st.session_state.groups[g_name] = edit_g_members
                             save_data()
-                            st.toast(f"Đã cập nhật nhóm {g_name}!", icon="✅")
                             st.rerun()
-                    if gc2.button("🗑️ Xóa nhóm", key=f"del_g_{g_name}", use_container_width=True):
+                    if gc2.button("🗑️ Xóa nhóm", key=f"del_g_{g_name}", type="primary", use_container_width=True):
                         st.session_state.groups.pop(g_name)
                         save_data()
-                        st.toast(f"Đã giải tán nhóm {g_name}!", icon="🧨")
                         st.rerun()
 
 # --- TAB 2: GHI HÓA ĐƠN ---
@@ -273,54 +311,43 @@ with tab2:
     st.subheader("🤖 AI giúp bạn ghi hoá đơn nhanh")
     c_ai1, c_ai2 = st.columns(2)
     
-    # Ép giờ hệ thống về GMT+7 (Giờ Việt Nam)
     gmt7 = timezone(timedelta(hours=7))
     current_time_str = datetime.now(gmt7).strftime('%d/%m/%Y %H:%M')
     
     with c_ai1:
-        # Thêm accept_multiple_files=True để cho phép chọn nhiều ảnh cùng lúc
-        up_files = st.file_uploader("📸 Nhập bill ở đây (Có thể chọn nhiều ảnh)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
-        if up_files and st.button("✨ Phân tích tất cả ảnh"):
+        up_files = st.file_uploader("📸 Nhập bill ở đây", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        if up_files and st.button("✨ Phân tích tất cả ảnh", type="primary"):
             try:
                 images = []
                 for f in up_files:
                     img = PIL.Image.open(f)
                     img.thumbnail((800, 800))
                     images.append(img)
-                
-                # Cập nhật Prompt để AI gộp chung nhiều bill lại thành 1 list
                 prompt_img = f"Hôm nay là {current_time_str} (Giờ Việt Nam). Đọc TẤT CẢ các bill trong các ảnh được cung cấp. Gộp chung tất cả các món ăn lại thành một danh sách duy nhất. Tìm ngày giờ hóa đơn (lấy ngày giờ của bill đầu tiên hoặc rõ ràng nhất). Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL"
-                
-                # Gửi toàn bộ prompt và danh sách ảnh cho AI
                 res = client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_img] + images)
-                
                 for line in res.text.strip().split('\n'):
                     line = line.strip()
-                    if line.upper().startswith("NGÀY:"): 
-                        st.session_state.ai_date = line[5:].strip()
+                    if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
                     else:
                         p = line.split('|')
                         if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
                 st.rerun()
-            except Exception as e: 
-                st.error(e)
+            except Exception as e: st.error(e)
             
     with c_ai2:
         txt_ai = st.text_area("💬 Dán tin nhắn của bạn ở đây:")
-        if txt_ai and st.button("✨ Phân tích chữ"):
+        if txt_ai and st.button("✨ Phân tích chữ", type="primary"):
             try:
-                prompt_txt = f"Hôm nay là {current_time_str} (Giờ Việt Nam). Đọc tin nhắn, tự suy luận ngày giờ đi ăn. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
+                prompt_txt = f"Hôm nay là {current_time_str}. Đọc tin nhắn, tự suy luận ngày giờ. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
                 res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt_txt)
                 for line in res.text.strip().split('\n'):
                     line = line.strip()
-                    if line.upper().startswith("NGÀY:"): 
-                        st.session_state.ai_date = line[5:].strip()
+                    if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
                     else:
                         p = line.split('|')
                         if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
                 st.rerun()
-            except Exception as e: 
-                st.error(e)
+            except Exception as e: st.error(e)
                 
     st.divider()
     st.subheader("📝 Nhập món lẻ (tuỳ chọn)")
@@ -328,14 +355,17 @@ with tab2:
     im_n = i_c1.text_input("Tên món:")
     im_p = i_c2.text_input("Giá (VD: 50k, 200...):")
     im_q = i_c3.number_input("SL", 1, 100, 1)
-    if i_c4.button("➕ Thêm"):
-        p = parse_amount(im_p)
-        if im_n and p > 0: st.session_state.current_items.append({"name": im_n, "price": p, "qty": im_q}); st.rerun()
+    
+    with i_c4:
+        st.markdown("<div style='margin-top: 28.5px;'></div>", unsafe_allow_html=True)
+        if st.button("➕ Thêm", type="primary", use_container_width=True):
+            p = parse_amount(im_p)
+            if im_n and p > 0: st.session_state.current_items.append({"name": im_n, "price": p, "qty": im_q}); st.rerun()
 
     total_bill = 0
     if st.session_state.current_items:
         st.write("---")
-        st.write("**📝 Danh sách món (Sửa trực tiếp hoặc Xóa):**")
+        st.write("**📝 Danh sách món:**")
         for idx, it in enumerate(st.session_state.current_items):
             col_n, col_p, col_q, col_del = st.columns([4, 3, 2, 1])
             new_name = col_n.text_input("Tên món", value=it['name'], key=f"edit_n_{idx}", label_visibility="collapsed")
@@ -351,24 +381,17 @@ with tab2:
     st.write("---")
     c_info1, c_info2 = st.columns(2)
     b_title = c_info1.text_input("Tiêu đề bill:", value="Đi ăn")
-    b_date = c_info2.text_input("Thời gian (AI tự điền):", value=st.session_state.get("ai_date", datetime.now().strftime("%d/%m/%Y %H:%M")))
+    b_date = c_info2.text_input("Thời gian:", value=st.session_state.get("ai_date", datetime.now().strftime("%d/%m/%Y %H:%M")))
 
     if total_bill == 0:
         q_amt = st.text_input("💰 Nhập tổng bill nhanh ở đây:", value="0")
         total_bill = parse_amount(q_amt)
 
-    # --- CHIA TIỀN TRẢ CỦA CÁC CHỦ NỢ (MULTI-PAYER) ---
     st.write("---")
-    st.markdown(f"#### 💳 Ai thanh toán? (Cần khớp với Tổng: {format_vn(total_bill)}đ)")
+    st.markdown(f"#### 💳 Ai thanh toán? (Tổng: {format_vn(total_bill)}đ)")
     all_members = list(st.session_state.members.keys())
     
-    selected_payers = st.multiselect(
-        "Chọn người đã ứng tiền:",
-        all_members,
-        default=[my_nick] if my_nick in all_members else [],
-        format_func=lambda x: f"Bản thân ({x})" if x == my_nick else x,
-        key="multi_payer_select"
-    )
+    selected_payers = st.multiselect("Chọn người đã ứng tiền:", all_members, default=[my_nick] if my_nick in all_members else [], format_func=lambda x: f"Bản thân ({x})" if x == my_nick else x, key="multi_payer_select")
 
     payer_data = {}
     if len(selected_payers) > 1:
@@ -376,39 +399,25 @@ with tab2:
         if pay_method == "Chia đều":
             each_pay = total_bill / len(selected_payers)
             for p in selected_payers: payer_data[p] = each_pay
-            st.info(f"Mỗi người đã quẹt: {format_vn(each_pay)}đ")
         elif pay_method == "Theo tỉ lệ (%)":
             cols = st.columns(len(selected_payers))
-            total_pct = 0
             for i, p in enumerate(selected_payers):
                 pct = cols[i].number_input(f"% của {p}", min_value=0, max_value=100, value=0, key=f"pct_{p}")
                 payer_data[p] = (pct / 100) * total_bill
-                total_pct += pct
-            if total_pct != 100 and total_pct != 0: st.warning(f"⚠️ Tổng tỉ lệ đang là {total_pct}%. Phải bằng 100%!")
         elif pay_method == "Số tiền cụ thể":
             cols = st.columns(len(selected_payers))
-            current_total = 0
             for i, p in enumerate(selected_payers):
                 amt = cols[i].number_input(f"Tiền {p} ứng ra", min_value=0, value=0, step=1000, key=f"amt_pay_{p}")
                 payer_data[p] = amt
-                current_total += amt
-            if current_total != total_bill and current_total > 0:
-                st.warning(f"⚠️ Lệch tiền! Tổng tiền nhập ({format_vn(current_total)}đ) khác Tổng bill ({format_vn(total_bill)}đ).")
     elif len(selected_payers) == 1:
         payer_data[selected_payers[0]] = total_bill
 
-    # --- CHIA TIỀN ĂN CỦA CON NỢ ---
     st.write("---")
     st.markdown("#### 🍴 Ai tham gia ăn?")
     use_g = st.selectbox("Chọn nhóm (để tick nhanh):", ["-- Chọn lẻ --"] + list(st.session_state.groups.keys()))
     def_m = list(st.session_state.members.keys())
     if use_g != "-- Chọn lẻ --": def_m = st.session_state.groups[use_g]
-    b_cons = st.multiselect(
-        "Danh sách người ăn:", 
-        def_m,
-        default=def_m,
-        format_func=lambda x: f"Bản thân ({x})" if x == my_nick else x
-    )
+    b_cons = st.multiselect("Danh sách người ăn:", def_m, default=def_m, format_func=lambda x: f"Bản thân ({x})" if x == my_nick else x)
 
     if b_cons and total_bill > 0:
         method = st.radio("Cách chia tiền ăn:", ["Chia đều", "Chia theo món lẻ", "Nhập riêng", "Chia %"], horizontal=True)
@@ -427,10 +436,6 @@ with tab2:
         elif method == "Chia đều":
             for c in b_cons: splits[c] = total_bill / len(b_cons)
 
-        st.markdown("### 👀 Xem trước Nợ (Preview)")
-        for c, amt in splits.items():
-            if amt > 0: st.write(f"- {c} nợ: **{format_vn(amt)}đ**")
-
         has_deadline = st.checkbox("📅 Đặt hạn chót thanh toán cho bill này?")
         b_deadline = None
         if has_deadline: b_deadline = st.date_input("Chọn ngày hạn chót:", value=datetime.now().date()).strftime("%d/%m/%Y")
@@ -446,7 +451,7 @@ with tab2:
                     "name": b_title, 
                     "amount": total_bill, 
                     "payer": selected_payers[0] if len(selected_payers) == 1 else "Nhóm trả", 
-                    "payer_data": payer_data, # <--- Quan trọng
+                    "payer_data": payer_data,
                     "splits": splits, 
                     "status": "unpaid", 
                     "paid_by": [],
@@ -455,10 +460,13 @@ with tab2:
                 st.session_state.current_items = []
                 st.session_state.ai_date = datetime.now().strftime("%d/%m/%Y %H:%M")
                 save_data()
-                st.toast("✅ Đã lưu vào sổ nợ thành công!", icon="💸")
+                
+                st.balloons()
+                st.success("🎉 LƯU THÀNH CÔNG! Đang cập nhật lại hệ thống...")
+                time.sleep(1.5)
                 st.rerun()
 
-# --- TAB 3: CHỐT SỔ (Bù trừ nợ chéo) ---
+# --- TAB 3: CHỐT SỔ ---
 with tab3:
     today = datetime.now().date()
     urgent_alerts = []
@@ -488,7 +496,6 @@ with tab3:
         use_netting = st.toggle("🔀 Bật tính nhanh nợ chéo (Bù trừ nợ qua lại)", value=False)
         msg_out = "📣 TỔNG KẾT CHỐT SỔ SÒNG PHẲNG:\n"
         
-        # --- LOGIC TÍNH NỢ (HỖ TRỢ MULTI-PAYER) ---
         matrix = {m1: {m2: 0 for m2 in st.session_state.members} for m1 in st.session_state.members}
         details = {m1: {m2: [] for m2 in st.session_state.members} for m1 in st.session_state.members}
         debts_dict = {}
@@ -513,11 +520,9 @@ with tab3:
                     for creditor, c_bal in pos.items():
                         amt = abs(d_bal) * (c_bal / tot_pos)
                         if amt > 1:
-                            # Cho Mode 1
                             pair = (debtor, creditor)
                             if pair not in debts_dict: debts_dict[pair] = []
                             debts_dict[pair].append({"date": b['date'], "name": b['name'], "amount": amt, "deadline": b.get('deadline'), "b_id": b.get('id')})
-                            # Cho Mode 2
                             matrix[debtor][creditor] += amt
                             details[debtor][creditor].append({"date": b['date'], "name": b['name'], "amount": amt, "deadline": b.get('deadline'), "b_id": b.get('id')})
         
@@ -547,8 +552,10 @@ with tab3:
         
         msg_out += "\n(Mọi người vào web check bill và chuyển khoản nha💸)"
         with st.expander("📋 Lấy tin nhắn gửi nhóm (Copy nhanh)"): st.code(msg_out, language="text")
+        
         st.write("---")
 
+        # KHU VỰC HIỂN THỊ MÃ QR VÀ NÚT XÁC NHẬN TRẢ TIỀN
         if not use_netting:
             st.markdown("### 📜 Danh sách nợ chi tiết")
             for (debtor, creditor), items in debts_dict.items():
@@ -574,7 +581,6 @@ with tab3:
                                 if 'paid_by' not in b: b['paid_by'] = []
                                 if debtor not in b['paid_by']: b['paid_by'].append(debtor)
                                 
-                                # Check if bill is fully paid
                                 t_p_data = b.get('payer_data', {b.get('payer', ''): b.get('amount', 0)})
                                 t_bals = {}
                                 for p, a in t_p_data.items():
@@ -610,7 +616,6 @@ with tab3:
                                         if b.get('id') in b_ids and b['status'] == 'unpaid':
                                             if 'paid_by' not in b: b['paid_by'] = []
                                             if m1 not in b['paid_by']: b['paid_by'].append(m1)
-                                            # Status check
                                             t_p = b.get('payer_data', {b.get('payer', ''): b.get('amount', 0)})
                                             t_b = {}
                                             for p, a in t_p.items():
@@ -640,7 +645,6 @@ with tab3:
                                         if b.get('id') in b_ids and b['status'] == 'unpaid':
                                             if 'paid_by' not in b: b['paid_by'] = []
                                             if m2 not in b['paid_by']: b['paid_by'].append(m2)
-                                            # Status check
                                             t_p = b.get('payer_data', {b.get('payer', ''): b.get('amount', 0)})
                                             t_b = {}
                                             for p, a in t_p.items():
@@ -655,14 +659,26 @@ with tab3:
 # --- TAB 4: NHẬT KÝ ---
 with tab4:
     st.subheader("🕒 Lịch sử hóa đơn gốc")
-    for b in reversed(st.session_state.history):
-        with st.expander(f"[{b['date']}] {b['name']} - {format_vn(b['amount'])}đ"):
-            p_data_str = ", ".join([f"{k} ({format_vn(v)}đ)" for k,v in b.get('payer_data', {b.get('payer', ''): b.get('amount', 0)}).items()])
-            st.write(f"**Nguồn tiền:** {p_data_str}")
-            for p, amt in b['splits'].items():
-                if amt > 0:
-                    status = "✅ Xong" if p in b.get('paid_by', []) or b['status'] == 'paid' else "🔴 Nợ"
-                    st.write(f"- {p} ăn: {format_vn(amt)}đ ({status})")
+    
+    if not st.session_state.history:
+        st.markdown("<h3 style='text-align: center; color: #ff4b4b; padding: 50px 0;'>🙌🙌🙌 Chưa có hoá đơn, lên kèo đi chơi thôi!!! 🙌🙌🙌</h3>", unsafe_allow_html=True)
+    else:
+        for i, b in enumerate(reversed(st.session_state.history)):
+            real_index = len(st.session_state.history) - 1 - i
+            with st.expander(f"[{b['date']}] {b['name']} - {format_vn(b['amount'])}đ"):
+                p_data_str = ", ".join([f"{k} ({format_vn(v)}đ)" for k,v in b.get('payer_data', {b.get('payer', ''): b.get('amount', 0)}).items()])
+                st.write(f"**Nguồn tiền:** {p_data_str}")
+                for p, amt in b['splits'].items():
+                    if amt > 0:
+                        status = "✅ Xong" if p in b.get('paid_by', []) or b['status'] == 'paid' else "🔴 Nợ"
+                        st.write(f"- {p} ăn: {format_vn(amt)}đ ({status})")
+                
+                st.write("---")
+                if st.button(f"🗑️ Xóa bill này", key=f"del_b_{b['id']}", type="primary"):
+                    st.session_state.history.pop(real_index)
+                    save_data()
+                    st.toast("Đã xóa hóa đơn!", icon="✅")
+                    st.rerun()
 
 # --- TAB 5: WRAPPED & ANALYTICS ---
 with tab5:
@@ -672,6 +688,7 @@ with tab5:
     if not st.session_state.history:
         st.info("Chưa có dữ liệu. Hãy ghi bill để mở khóa báo cáo!")
     else:
+        # TÍNH NĂNG THỐNG KÊ CHI TIẾT
         time_filter = st.radio("⏳ Mốc thời gian:", ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
         filtered_history = []
         for b in st.session_state.history:
@@ -759,7 +776,6 @@ with tab5:
             st.write("---")
             st.subheader("📊 Biểu đồ Xếp hạng Nợ (Top 10)")
             if all_unpaid_debts:
-                import pandas as pd
                 top_10 = sorted(all_unpaid_debts, key=lambda x: x['amount'], reverse=True)[:10]
                 df_chart = pd.DataFrame({"Khoản nợ": [f"{d['debtor']} ➜ {d['creditor']}\n({d['item']})" for d in top_10], "Số tiền (VNĐ)": [d['amount'] for d in top_10]}).set_index("Khoản nợ")
                 st.bar_chart(df_chart, color="#ff4b4b")
