@@ -394,12 +394,18 @@ with tab3:
     if not unpaid: st.success("Tất cả hóa đơn đã thanh toán xong! 🎉")
     else:
         st.subheader("⚙️ Tùy chọn chốt nợ")
+        
+        # ==========================================
+        # MỤC 1: CÔNG TẮC BÙ TRỪ
+        # ==========================================
         use_netting = st.toggle("🔀 Bật tính nhanh nợ chéo", value=True)
         
+        # --- BẮT ĐẦU XỬ LÝ TOÁN HỌC TRƯỚC ---
         matrix = {m1: {m2: 0 for m2 in st.session_state.members} for m1 in st.session_state.members}
         details = {m1: {m2: [] for m2 in st.session_state.members} for m1 in st.session_state.members}
         debts_dict = {}
 
+        # 1. Quét dữ liệu lấy nợ gốc
         for b in unpaid:
             p_data = b.get('payer_data', {})
             splits = b.get('splits', {})
@@ -426,22 +432,63 @@ with tab3:
                             matrix[debtor][creditor] += amt
                             details[debtor][creditor].append({"name": b['name'], "amount": amt, "b_id": b.get('id')})
         
-        if not use_netting:
-            st.markdown("### 📜 Danh sách nợ chi tiết (Không bù trừ)")
-            
-            # +++ BẮT ĐẦU PHẦN THÊM MỚI: TẠO NÚT COPY KHI KHÔNG BÙ TRỪ +++
-            msg_out_raw = "📣 TỔNG KẾT CHỐT SỔ NỢ (KHÔNG BÙ TRỪ):\n"
-            if debts_dict:
-                for (d_raw, c_raw), items_raw in debts_dict.items():
-                    total_owed_raw = sum(item['amount'] for item in items_raw)
-                    msg_out_raw += f"🔸 {get_pure_name(d_raw)} nợ {get_pure_name(c_raw)}: {format_vn(total_owed_raw)}đ\n"
-                
-                with st.expander("📋 Copy tin nhắn gửi nhóm (Không bù trừ)"):
-                    st.code(msg_out_raw, language="text")
-                st.write("---")
-            # +++ KẾT THÚC PHẦN THÊM MỚI +++
+        # 2. Tạo sẵn Tin nhắn KHÔNG bù trừ
+        msg_raw = "📣 TỔNG KẾT CHỐT SỔ NỢ (Chưa bù trừ):\n"
+        if debts_dict:
+            for (d_raw, c_raw), items_raw in debts_dict.items():
+                tot_amt = sum(it['amount'] for it in items_raw)
+                msg_raw += f"🔸 {get_pure_name(d_raw)} nợ {get_pure_name(c_raw)}: {format_vn(tot_amt)}đ\n"
+        else:
+            msg_raw += "Không có khoản nợ nào.\n"
 
-            # Đoạn code hiển thị UI cũ của bạn giữ nguyên:
+        # 3. Tạo sẵn Tin nhắn CÓ bù trừ
+        msg_netting = "📣 TỔNG KẾT CHỐT SỔ NỢ (Đã bù trừ):\n"
+        net_bal = {m: 0 for m in st.session_state.members}
+        for d in matrix:
+            for c in matrix[d]:
+                net_bal[c] += matrix[d][c]
+                net_bal[d] -= matrix[d][c]
+        
+        debtors_l = [[m, abs(v)] for m, v in net_bal.items() if v < -1]
+        creditors_l = [[m, v] for m, v in net_bal.items() if v > 1]
+        
+        found_netting = False
+        if debtors_l:
+            while debtors_l and creditors_l:
+                debtors_l.sort(key=lambda x: x[1], reverse=True); creditors_l.sort(key=lambda x: x[1], reverse=True)
+                d_n, d_a = debtors_l[0]; c_n, c_a = creditors_l[0]
+                s_a = min(d_a, c_a)
+                msg_netting += f"✨ {get_pure_name(d_n)} chuyển cho {get_pure_name(c_n)}: {format_vn(s_a)}đ\n"
+                debtors_l[0][1] -= s_a; creditors_l[0][1] -= s_a
+                if debtors_l[0][1] < 1: debtors_l.pop(0)
+                if creditors_l[0][1] < 1: creditors_l.pop(0)
+        else:
+            msg_netting += "Không có khoản nợ nào cần chốt.\n"
+            
+        for i in range(len(list(st.session_state.members.keys()))):
+            for j in range(i + 1, len(list(st.session_state.members.keys()))):
+                m1, m2 = list(st.session_state.members.keys())[i], list(st.session_state.members.keys())[j]
+                if matrix[m1][m2] > matrix[m2][m1] and (matrix[m1][m2] - matrix[m2][m1]) > 1: found_netting = True
+                elif matrix[m2][m1] > matrix[m1][m2] and (matrix[m2][m1] - matrix[m1][m2]) > 1: found_netting = True
+
+
+        # ==========================================
+        # MỤC 2: COPY TIN NHẮN (Luôn hiển thị)
+        # ==========================================
+        st.write("---")
+        st.subheader("📋 Copy tin nhắn gửi nhóm")
+        if use_netting:
+            st.code(msg_netting, language="text")
+        else:
+            st.code(msg_raw, language="text")
+            
+        st.write("---")
+        
+        # ==========================================
+        # MỤC 3: DANH SÁCH NỢ & THANH TOÁN
+        # ==========================================
+        if not use_netting:
+            st.subheader("📜 Danh sách nợ chi tiết (Không bù trừ)")
             for (debtor, creditor), items in debts_dict.items():
                 total_owed = sum(item['amount'] for item in items)
                 with st.expander(f"🔴 **{get_pure_name(debtor)}** nợ **{get_pure_name(creditor)}**: {format_vn(total_owed)}đ"):
@@ -463,41 +510,17 @@ with tab3:
                                     if c not in b['paid_by']: t_bals[c] = t_bals.get(c, 0) - a
                                 if not any(v < -1 for v in t_bals.values()): b['status'] = 'paid'
                         save_data(); st.rerun()
-                    
         else:
-            net_bal = {m: 0 for m in st.session_state.members}
-            for d in matrix:
-                for c in matrix[d]:
-                    net_bal[c] += matrix[d][c]
-                    net_bal[d] -= matrix[d][c]
-            
-            debtors_l = [[m, abs(v)] for m, v in net_bal.items() if v < -1]
-            creditors_l = [[m, v] for m, v in net_bal.items() if v > 1]
-            
-            msg_out = "📣 TỔNG KẾT CHỐT SỔ NỢ:\n"
-            found_netting = False
-
-            if debtors_l:
-                while debtors_l and creditors_l:
-                    debtors_l.sort(key=lambda x: x[1], reverse=True); creditors_l.sort(key=lambda x: x[1], reverse=True)
-                    d_n, d_a = debtors_l[0]; c_n, c_a = creditors_l[0]
-                    s_a = min(d_a, c_a)
-                    msg_out += f"✨ {get_pure_name(d_n)} chuyển thẳng cho {get_pure_name(c_n)}: {format_vn(s_a)}đ\n"
-                    debtors_l[0][1] -= s_a; creditors_l[0][1] -= s_a
-                    if debtors_l[0][1] < 1: debtors_l.pop(0)
-                    if creditors_l[0][1] < 1: creditors_l.pop(0)
-                
-                with st.expander("📋 Copy tin nhắn gửi nhóm"): st.code(msg_out, language="text")
-                st.write("---")
-                
-                # Render giao diện thanh toán Netting
+            st.subheader("📜 Danh sách nợ chéo (Đã bù trừ)")
+            if not found_netting: 
+                st.info("Không có khoản nợ nào cần chốt.")
+            else:
                 for i in range(len(list(st.session_state.members.keys()))):
                     for j in range(i + 1, len(list(st.session_state.members.keys()))):
                         m1, m2 = list(st.session_state.members.keys())[i], list(st.session_state.members.keys())[j]
                         if matrix[m1][m2] > matrix[m2][m1]:
                             net_amt = matrix[m1][m2] - matrix[m2][m1]
                             if net_amt > 1:
-                                found_netting = True
                                 with st.expander(f"👉 **{get_pure_name(m1)}** cần chuyển **{get_pure_name(m2)}**: {format_vn(net_amt)}đ"):
                                     c_info = st.session_state.members.get(m2, {})
                                     if c_info.get('bank') and c_info.get('acc'):
@@ -518,7 +541,6 @@ with tab3:
                         elif matrix[m2][m1] > matrix[m1][m2]:
                             net_amt = matrix[m2][m1] - matrix[m1][m2]
                             if net_amt > 1:
-                                found_netting = True
                                 with st.expander(f"👉 **{get_pure_name(m2)}** cần chuyển **{get_pure_name(m1)}**: {format_vn(net_amt)}đ"):
                                     c_info = st.session_state.members.get(m1, {})
                                     if c_info.get('bank') and c_info.get('acc'):
