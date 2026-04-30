@@ -136,7 +136,7 @@ div[data-testid="stToast"] {
 
 /* ── Divider ── */
 hr {
-    border: none !important;
+    border: border !important;
     height: 2px !important;
     margin: 1rem 0 !important;
 }
