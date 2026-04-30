@@ -563,42 +563,104 @@ with tab4:
                 st.write("---")
                 if st.button(f"🗑️ Xóa bill", key=f"del_b_{b['id']}", type="primary"): confirm_delete_bill(real_idx, b['name'])
 
-# --- TAB 5: WRAPPED ---
+# --- TAB 5: WRAPPED & ANALYTICS ---
 with tab5:
-    st.markdown(f"<h2 style='text-align: center; color: #ff4b4b;'>🎉 Share Bills Wrapped</h2>", unsafe_allow_html=True)
-    if not st.session_state.history: st.info("Ghi bill để xem báo cáo!")
+    my_nick = st.session_state.get('nickname', 'Bạn')
+    st.markdown(f"<h2 style='text-align: center; color: #ff4b4b;'>🎉 Share Bills Wrapped - {my_nick}</h2>", unsafe_allow_html=True)
+    
+    if not st.session_state.history:
+        st.info("Chưa có dữ liệu. Hãy ghi bill để mở khóa báo cáo!")
     else:
-        time_filter = st.radio("⏳ Mốc thời gian:", [f"Tháng này (Tháng {datetime.now().month})", f"Từ đầu năm ({datetime.now().year})"], horizontal=True)
+        # TÍNH NĂNG THỐNG KÊ CHI TIẾT
+        time_filter = st.radio("⏳ Mốc thời gian:", ["Tháng này (Tháng 4)", "Từ đầu năm (2026)"], horizontal=True)
         filtered_history = []
         for b in st.session_state.history:
             try:
                 match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', str(b['date']))
                 if match:
                     d_m, d_y = int(match.group(2)), int(match.group(3))
-                    if ("Tháng này" in time_filter and d_m == datetime.now().month and d_y == datetime.now().year) or ("đầu năm" in time_filter and d_y == datetime.now().year):
+                    if ("Tháng này" in time_filter and d_m == 4 and d_y == 2026) or ("đầu năm" in time_filter and d_y == 2026):
                         filtered_history.append(b)
             except: pass
 
         if not filtered_history: st.warning("Không có dữ liệu trong khoảng thời gian này.")
         else:
-            my_spent = sum(b.get('splits', {}).get(my_id, 0) for b in filtered_history)
-            st.markdown(f"### 📊 Dashboard của bạn")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Tiền bạn đã chi (Tiền ăn)", f"{format_vn(my_spent)}đ")
-            
-            # Logic xếp hạng biểu đồ (Mô phỏng đơn giản từ số lượng bill)
-            debt_chart_data = []
+            my_spent = 0
+            others_owe_me = {}
+            i_owe_others = {}
+            group_stats = {}
+            all_unpaid_debts = []
+            my_nick_lower = my_nick.strip().lower()
+
             for b in filtered_history:
+                splits = b.get('splits', {})
+                paid_by = b.get('paid_by', [])
+                p_data = b.get('payer_data', {b.get('payer', ''): b.get('amount', 0)})
+                
+                my_name_in_bill = None
+                for name in set(list(splits.keys()) + list(p_data.keys())):
+                    if name.strip().lower() == my_nick_lower:
+                        my_name_in_bill = name; break
+
+                if my_name_in_bill in splits: my_spent += splits[my_name_in_bill]
+                
                 if b.get('status') == 'unpaid':
-                    for c_id, amt in b.get('splits', {}).items():
-                        if c_id not in b.get('paid_by', []) and amt > 0:
-                            p_name = get_pure_name(list(b.get('payer_data', {}).keys())[0]) if b.get('payer_data') else "Nhóm"
-                            debt_chart_data.append({"Khoản nợ": f"{get_pure_name(c_id)} nợ {p_name}", "Số tiền": amt})
+                    bals = {}
+                    for p, a in p_data.items():
+                        if p not in paid_by: bals[p] = bals.get(p, 0) + a
+                    for c, a in splits.items():
+                        if c not in paid_by: bals[c] = bals.get(c, 0) - a
+                        
+                    pos_bals = {k: v for k, v in bals.items() if v > 1000}
+                    neg_bals = {k: v for k, v in bals.items() if v < -1000}
+                    tot_pos = sum(pos_bals.values())
+                    
+                    if my_name_in_bill in bals and tot_pos > 0:
+                        my_bal = bals[my_name_in_bill]
+                        if my_bal > 1000:
+                            for k, v in neg_bals.items(): others_owe_me[k] = others_owe_me.get(k, 0) + abs(v) * (my_bal / tot_pos)
+                        elif my_bal < -1000:
+                            for k, v in pos_bals.items(): i_owe_others[k] = i_owe_others.get(k, 0) + abs(my_bal) * (v / tot_pos)
+
+                    if tot_pos > 0:
+                        for d_name, d_bal in neg_bals.items():
+                            for c_name, c_bal in pos_bals.items():
+                                owed_amt = abs(d_bal) * (c_bal / tot_pos)
+                                if owed_amt > 1000: all_unpaid_debts.append({"debtor": d_name, "creditor": c_name, "amount": int(owed_amt), "item": b.get('name', 'Bill')})
+
+                gn = "Nhóm chung"
+                for name, members in st.session_state.groups.items():
+                    if set(splits.keys()) == set(members): gn = name; break
+                if gn not in group_stats: group_stats[gn] = {"count": 0, "money": 0}
+                group_stats[gn]["count"] += 1
+                group_stats[gn]["money"] += b.get('amount', 0)
+
+            st.markdown(f"### 📊 Dashboard của {my_nick}")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Tiền bạn đã chi", f"{format_vn(my_spent)}đ")
             
+            tot_o_me = sum(others_owe_me.values())
+            tot_i_o = sum(i_owe_others.values())
+            
+            m_debtor = max(others_owe_me, key=others_owe_me.get) if others_owe_me else "Không ai"
+            if m_debtor != "Không ai": c2.metric("Nợ bạn nhiều nhất", m_debtor, f"{format_vn(others_owe_me.get(m_debtor, 0))}đ / Tổng: {format_vn(tot_o_me)}đ", delta_color="normal")
+            else: c2.metric("Nợ bạn nhiều nhất", "Không ai", "0đ / Tổng: 0đ", delta_color="off")
+            
+            m_creditor = max(i_owe_others, key=i_owe_others.get) if i_owe_others else "Không ai"
+            if m_creditor != "Không ai": c3.metric("Bạn nợ nhiều nhất", m_creditor, f"-{format_vn(i_owe_others.get(m_creditor, 0))}đ / Tổng: -{format_vn(tot_i_o)}đ", delta_color="inverse")
+            else: c3.metric("Bạn nợ nhiều nhất", "Không ai", "0đ / Tổng: 0đ", delta_color="off")
+
             st.write("---")
-            st.subheader("📊 Top các khoản đang nợ (Biểu đồ)")
-            if debt_chart_data:
-                df = pd.DataFrame(debt_chart_data).groupby("Khoản nợ").sum().reset_index()
-                df = df.sort_values(by="Số tiền", ascending=False).head(10).set_index("Khoản nợ")
-                st.bar_chart(df, color="#ff4b4b")
-            else: st.info("Tuyệt vời, không có ai nợ ai!")
+            st.subheader("🔥 Bảng Xếp Hạng Nhóm (Leaderboard)")
+            for i, (name, s) in enumerate(sorted(group_stats.items(), key=lambda x: x[1]['count'], reverse=True)):
+                medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "🔹"
+                st.write(f"{medal} **{name}**: {s['count']} kèo - Tổng chi: {format_vn(s['money'])}đ")
+
+            st.write("---")
+            st.subheader("📊 Biểu đồ Xếp hạng Nợ (Top 10)")
+            if all_unpaid_debts:
+                top_10 = sorted(all_unpaid_debts, key=lambda x: x['amount'], reverse=True)[:10]
+                df_chart = pd.DataFrame({"Khoản nợ": [f"{d['debtor']} ➜ {d['creditor']}\n({d['item']})" for d in top_10], "Số tiền (VNĐ)": [d['amount'] for d in top_10]}).set_index("Khoản nợ")
+                st.bar_chart(df_chart, color="#ff4b4b")
+                with st.expander("🔍 Xem chi tiết bảng số liệu"): st.table(df_chart.style.format("{:,}₫"))
+            else: st.info("Sổ nợ trống, không có gì để vẽ biểu đồ cả! 🎉")
