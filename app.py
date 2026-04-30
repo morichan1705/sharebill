@@ -231,7 +231,7 @@ with tab1:
         if not friend_ids: st.info("Chưa có ai trong danh bạ.")
         else:
             if 'friend_page' not in st.session_state: st.session_state.friend_page = 1
-            per_page = 6
+            per_page = 5
             total_pages = max(1, math.ceil(len(friend_ids) / per_page))
             if st.session_state.friend_page > total_pages: st.session_state.friend_page = total_pages
             start_idx = (st.session_state.friend_page - 1) * per_page
@@ -258,10 +258,18 @@ with tab1:
                         save_data(); st.rerun()
             
             if total_pages > 1:
-                cp1, cp2, cp3 = st.columns([1, 2, 1])
-                if cp1.button("⬅️ Trước", disabled=(st.session_state.friend_page == 1)): st.session_state.friend_page -= 1; st.rerun()
-                cp2.markdown(f"<div style='text-align: center; margin-top: 10px;'>{st.session_state.friend_page} / {total_pages}</div>", unsafe_allow_html=True)
-                if cp3.button("Sau ➡️", disabled=(st.session_state.friend_page == total_pages)): st.session_state.friend_page += 1; st.rerun()
+                # Đổi tỷ lệ cột để đẩy 2 nút ra sát lề
+                cp1, cp2, cp3 = st.columns([1.5, 7, 1.5]) 
+                
+                # Thêm use_container_width=True vào nút Trước
+                if cp1.button("⬅️ Trước", disabled=(st.session_state.friend_page == 1), use_container_width=True): 
+                    st.session_state.friend_page -= 1; st.rerun()
+                    
+                cp2.markdown(f"<div style='text-align: center; margin-top: 5px; font-weight: 500;'>Trang {st.session_state.friend_page} / {total_pages}</div>", unsafe_allow_html=True)
+                
+                # Thêm use_container_width=True vào nút Sau
+                if cp3.button("Sau ➡️", disabled=(st.session_state.friend_page == total_pages), use_container_width=True): 
+                    st.session_state.friend_page += 1; st.rerun()
 
     st.write("---")
     st.markdown("### 🧑‍🤝‍🧑 Quản lý Nhóm đi chơi")
@@ -301,11 +309,17 @@ with tab1:
                         st.session_state.groups.pop(g_name); save_data(); st.rerun()
 
             if total_pages_g > 1:
-                gp1, gp2, gp3 = st.columns([1, 2, 1])
-                if gp1.button("⬅️ Trước", key="g_prev", disabled=(st.session_state.group_page == 1)): 
+                # Đổi tỷ lệ cột tương tự như trên
+                gp1, gp2, gp3 = st.columns([1.5, 7, 1.5])
+                
+                # Thêm use_container_width=True
+                if gp1.button("⬅️ Trước", key="g_prev", disabled=(st.session_state.group_page == 1), use_container_width=True): 
                     st.session_state.group_page -= 1; st.rerun()
-                gp2.markdown(f"<div style='text-align: center; margin-top: 10px;'>{st.session_state.group_page} / {total_pages_g}</div>", unsafe_allow_html=True)
-                if gp3.button("Sau ➡️", key="g_next", disabled=(st.session_state.group_page == total_pages_g)): 
+                    
+                gp2.markdown(f"<div style='text-align: center; margin-top: 5px; font-weight: 500;'>Trang {st.session_state.group_page} / {total_pages_g}</div>", unsafe_allow_html=True)
+                
+                # Thêm use_container_width=True
+                if gp3.button("Sau ➡️", key="g_next", disabled=(st.session_state.group_page == total_pages_g), use_container_width=True): 
                     st.session_state.group_page += 1; st.rerun()
 
 # --- TAB 2: GHI HÓA ĐƠN ---
@@ -338,7 +352,7 @@ with tab2:
         if txt_ai and st.button("✨ Phân tích chữ", type="primary"):
             with st.spinner("🤖 AI đang đọc tin nhắn..."):
                 try:
-                    res = client.models.generate_content(model='gemini-2.5-flash', contents=f"Hôm nay là {current_time_str}. Đọc tin nhắn:\n{txt_ai}\nTrả về:\nNGÀY: dd/mm/yyyy hh:mm\nTÊN|GIÁ|SL")
+                    res = client.models.generate_content(model='gemini-3-flash', contents=f"Hôm nay là {current_time_str}. Đọc tin nhắn:\n{txt_ai}\nTrả về:\nNGÀY: dd/mm/yyyy hh:mm\nTÊN|GIÁ|SL")
                     for line in res.text.strip().split('\n'):
                         if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
                         else:
