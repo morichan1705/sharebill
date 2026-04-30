@@ -15,20 +15,7 @@ st.set_page_config(page_title="Share Bills Super Ultimate", page_icon="💸", la
 # CSS TUỲ CHỈNH: Đổi màu nền, màu ô nhập liệu, ẩn "Enter to apply" và đổi màu nút đỏ
 st.markdown("""
 <style>
-    /* Đổi màu nền toàn trang */
-    .stApp {
-        background-color: #FFEDCE !important;
-    }
-    
-    /* Đổi màu các ô nhập liệu (input, select, textarea) */
-    div[data-baseweb="input"] > div, 
-    div[data-baseweb="select"] > div, 
-    div[data-baseweb="textarea"] > div,
-    input[type="number"] {
-        background-color: #FFC193 !important;
-        border: 1px solid #ffa559 !important;
-    }
-
+  
     /* Ẩn dòng chữ "Press Enter to apply" mặc định của Streamlit */
     div[data-testid="InputInstructions"] {
         display: none !important;
