@@ -244,7 +244,7 @@ with tab1:
         if not st.session_state.groups: st.info("Chưa có hội nhóm nào.")
         else:
             for g_name, g_members in list(st.session_state.groups.items()):
-                with st.expander(f"📌 {g_name} ({len(g_members)} TV)"):
+                with st.expander(f"📌 {g_name} ({len(g_members)} thành viên)"):
                     edit_g_members = st.multiselect("Thành viên:", all_mem_ids, default=[m for m in g_members if m in all_mem_ids], format_func=get_name, key=f"eg_{g_name}")
                     gc1, gc2 = st.columns(2)
                     if gc1.button("💾 Lưu", key=f"sg_{g_name}", use_container_width=True) and len(edit_g_members) >= 2:
