@@ -24,12 +24,6 @@ html, body, [class*="css"] {
     font-family: 'Nunito', sans-serif !important;
 }
 
-/* ── Nền tổng thể ── */
-.stApp {
-    background: linear-gradient(135deg, #fff5f5 0%, #fff0fb 50%, #f0f4ff 100%) !important;
-    background-attachment: fixed !important;
-}
-
 /* ── Ẩn footer Streamlit ── */
 footer { visibility: hidden; }
 div[data-testid="InputInstructions"] { display: none !important; }
