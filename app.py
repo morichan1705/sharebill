@@ -5,6 +5,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from google import genai
+from supabase import create_client
 import PIL.Image
 
 # --- 1. CÀI ĐẶT TRANG CƠ BẢN ---
@@ -17,24 +18,25 @@ try:
 except Exception as e:
     client = None
 
-# --- 2. HỆ THỐNG ĐĂNG NHẬP / ĐĂNG KÝ ---
-USERS_FILE = 'users.json'
+# --- KHỞI TẠO SUPABASE ---
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r', encoding='utf-8') as f: return json.load(f)
-    return {}
+supabase = init_supabase()
 
-def save_users(users_data):
-    with open(USERS_FILE, 'w', encoding='utf-8') as f: json.dump(users_data, f)
-
-# Khởi tạo biến users ở NGOÀI CÙNG để không bao giờ bị lỗi NameError
-users = load_users()
-
+# --- 2. HỆ THỐNG ĐĂNG NHẬP / ĐĂNG KÝ (LƯU TRÊN CLOUD) ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ''
     st.session_state.nickname = ''
+
+# Hàm hỗ trợ lấy thông tin user từ Supabase
+def get_user_from_db(username):
+    res = supabase.table("users").select("*").eq("username", username).execute()
+    return res.data[0] if res.data else None
 
 # GIAO DIỆN ĐĂNG NHẬP (Chỉ hiện khi chưa login)
 if not st.session_state.logged_in:
@@ -45,13 +47,12 @@ if not st.session_state.logged_in:
         l_user = st.text_input("Tài khoản:")
         l_pass = st.text_input("Mật khẩu:", type="password")
         if st.button("🚀 Đăng nhập", type="primary", use_container_width=True):
-            if l_user in users:
-                user_data = users[l_user]
-                stored_pass = user_data["pass"] if isinstance(user_data, dict) else user_data
-                if l_pass == stored_pass:
+            user_data = get_user_from_db(l_user)
+            if user_data:
+                if l_pass == user_data["password"]:
                     st.session_state.logged_in = True
                     st.session_state.username = l_user
-                    st.session_state.nickname = user_data.get("nickname", l_user) if isinstance(user_data, dict) else l_user
+                    st.session_state.nickname = user_data["nickname"]
                     st.rerun()
                 else:
                     st.error("Sai mật khẩu!")
@@ -64,20 +65,23 @@ if not st.session_state.logged_in:
         r_nick = st.text_input("Bạn muốn được gọi là gì? (Ví dụ: Trúc Lâm)", key="reg_nick")
         
         if st.button("📝 Đăng ký tài khoản", use_container_width=True):
-            if r_user in users: 
+            if get_user_from_db(r_user): 
                 st.error("ID này đã tồn tại!")
             elif r_user and r_pass and r_nick:
-                users[r_user] = {"pass": r_pass, "nickname": r_nick}
-                save_users(users)
+                # Lưu thẳng user mới lên database
+                supabase.table("users").insert({
+                    "username": r_user,
+                    "password": r_pass,
+                    "nickname": r_nick,
+                    "app_data": {"members": {}, "groups": {}, "history": []}
+                }).execute()
                 st.success("Đăng ký thành công! Mời bạn qua tab Đăng nhập.")
             else: 
                 st.warning("Vui lòng điền đủ 3 thông tin!")
                 
-    st.stop() # <--- CỰC KỲ QUAN TRỌNG: Chặn không cho web chạy tiếp nếu chưa login
+    st.stop() # Chặn web nếu chưa login
 
-# --- 3. CHUẨN BỊ DỮ LIỆU & GIAO DIỆN CHÍNH (Chạy sau khi đã login) ---
-DATA_FILE = f'data_{st.session_state.username}.json'
-
+# --- 3. CHUẨN BỊ DỮ LIỆU CÁ NHÂN HÓA (Chạy sau khi đã login) ---
 # Sidebar - Hiển thị Nickname
 st.sidebar.markdown(f"### ✨ Xin chào, **{st.session_state.get('nickname', 'Bạn')}**!")
 if st.sidebar.button("🚪 Đăng xuất"):
@@ -86,22 +90,30 @@ if st.sidebar.button("🚪 Đăng xuất"):
     st.session_state.nickname = ''
     st.rerun()
 
+# Kéo dữ liệu TỪ SUPABASE VỀ SESSION STATE
 def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            st.session_state.members = data.get('members', {})
-            st.session_state.groups = data.get('groups', {})
-            st.session_state.history = data.get('history', [])
+    user_data = get_user_from_db(st.session_state.username)
+    if user_data and user_data.get('app_data'):
+        data = user_data['app_data']
+        st.session_state.members = data.get('members', {})
+        st.session_state.groups = data.get('groups', {})
+        st.session_state.history = data.get('history', [])
     else:
         st.session_state.members, st.session_state.groups, st.session_state.history = {}, {}, []
 
+# Đẩy dữ liệu TỪ SESSION STATE LÊN SUPABASE
 def save_data():
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump({'members': st.session_state.members, 'groups': st.session_state.groups, 'history': st.session_state.history}, f, ensure_ascii=False, indent=4)
+    new_app_data = {
+        'members': st.session_state.members, 
+        'groups': st.session_state.groups, 
+        'history': st.session_state.history
+    }
+    supabase.table("users").update({"app_data": new_app_data}).eq("username", st.session_state.username).execute()
 
-if 'members' not in st.session_state: load_data()
-
+# Khởi tạo data lần đầu khi mới đăng nhập xong
+if 'members' not in st.session_state: 
+    load_data()
+    
 # --- 2. HÀM BỔ TRỢ ---
 def parse_amount(text):
     if not text: return 0
