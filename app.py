@@ -301,40 +301,44 @@ with tab2:
     gmt7 = timezone(timedelta(hours=7))
     current_time_str = datetime.now(gmt7).strftime('%d/%m/%Y %H:%M')
     
-    with c_ai1:
+with c_ai1:
         up_files = st.file_uploader("📸 Nhập bill ở đây", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
         if up_files and st.button("✨ Phân tích tất cả ảnh", type="primary"):
-            try:
-                images = []
-                for f in up_files:
-                    img = PIL.Image.open(f)
-                    img.thumbnail((800, 800))
-                    images.append(img)
-                prompt_img = f"Hôm nay là {current_time_str} (Giờ Việt Nam). Đọc TẤT CẢ các bill trong các ảnh được cung cấp. Gộp chung tất cả các món ăn lại thành một danh sách duy nhất. Tìm ngày giờ hóa đơn (lấy ngày giờ của bill đầu tiên hoặc rõ ràng nhất). Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL"
-                res = client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_img] + images)
-                for line in res.text.strip().split('\n'):
-                    line = line.strip()
-                    if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
-                    else:
-                        p = line.split('|')
-                        if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
-                st.rerun()
-            except Exception as e: st.error(e)
+            # THÊM SPINNER Ở ĐÂY
+            with st.spinner("🤖 AI đang dán mắt vào đọc bill... Vui lòng đợi xíu!"):
+                try:
+                    images = []
+                    for f in up_files:
+                        img = PIL.Image.open(f)
+                        img.thumbnail((800, 800))
+                        images.append(img)
+                    prompt_img = f"Hôm nay là {current_time_str} (Giờ Việt Nam). Đọc TẤT CẢ các bill trong các ảnh được cung cấp. Gộp chung tất cả các món ăn lại thành một danh sách duy nhất. Tìm ngày giờ hóa đơn (lấy ngày giờ của bill đầu tiên hoặc rõ ràng nhất). Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL"
+                    res = client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_img] + images)
+                    for line in res.text.strip().split('\n'):
+                        line = line.strip()
+                        if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
+                        else:
+                            p = line.split('|')
+                            if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
+                    st.rerun()
+                except Exception as e: st.error(e)
             
     with c_ai2:
         txt_ai = st.text_area("💬 Dán tin nhắn của bạn ở đây:")
         if txt_ai and st.button("✨ Phân tích chữ", type="primary"):
-            try:
-                prompt_txt = f"Hôm nay là {current_time_str}. Đọc tin nhắn, tự suy luận ngày giờ. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
-                res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt_txt)
-                for line in res.text.strip().split('\n'):
-                    line = line.strip()
-                    if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
-                    else:
-                        p = line.split('|')
-                        if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
-                st.rerun()
-            except Exception as e: st.error(e)
+            # THÊM SPINNER Ở ĐÂY
+            with st.spinner("🤖 AI đang phân tích tin nhắn..."):
+                try:
+                    prompt_txt = f"Hôm nay là {current_time_str}. Đọc tin nhắn, tự suy luận ngày giờ. Trả về đúng định dạng:\nDòng 1: NGÀY: dd/mm/yyyy hh:mm\nCác dòng sau: TÊN|GIÁ|SL\n\nTin nhắn: {txt_ai}"
+                    res = client.models.generate_content(model='gemini-2.5-flash', contents=prompt_txt)
+                    for line in res.text.strip().split('\n'):
+                        line = line.strip()
+                        if line.upper().startswith("NGÀY:"): st.session_state.ai_date = line[5:].strip()
+                        else:
+                            p = line.split('|')
+                            if len(p) == 3: st.session_state.current_items.append({"name": p[0], "price": parse_amount(p[1]), "qty": int(p[2])})
+                    st.rerun()
+                except Exception as e: st.error(e)
                 
     st.divider()
     st.subheader("📝 Nhập món lẻ (tuỳ chọn)")
@@ -647,25 +651,61 @@ with tab3:
 with tab4:
     st.subheader("🕒 Lịch sử hóa đơn gốc")
     
+    # ĐỊNH NGHĨA POP-UP XÁC NHẬN XÓA (Tính năng mới của Streamlit)
+    @st.dialog("⚠️ Xác nhận xóa hóa đơn")
+    def confirm_delete_bill(real_index, bill_name):
+        st.write(f"Bạn có chắc chắn muốn xóa bill **{bill_name}** không?")
+        st.write("Hành động này không thể hoàn tác và sẽ làm thay đổi sổ nợ của cả nhóm!")
+        c1, c2 = st.columns(2)
+        if c1.button("Hủy bỏ", use_container_width=True):
+            st.rerun()
+        if c2.button("Xóa luôn!", type="primary", use_container_width=True):
+            st.session_state.history.pop(real_index)
+            save_data()
+            st.toast("Đã xóa hóa đơn thành công!", icon="✅")
+            st.rerun()
+
     if not st.session_state.history:
         st.markdown("<h3 style='text-align: center; color: #ff4b4b; padding: 50px 0;'>🙌🙌🙌 Chưa có hoá đơn, lên kèo đi chơi thôi!!! 🙌🙌🙌</h3>", unsafe_allow_html=True)
     else:
-        for i, b in enumerate(reversed(st.session_state.history)):
-            real_index = len(st.session_state.history) - 1 - i
-            with st.expander(f"[{b['date']}] {b['name']} - {format_vn(b['amount'])}đ"):
+        # BỘ LỌC VÀ SẮP XẾP BILL
+        filter_col1, filter_col2 = st.columns(2)
+        status_filter = filter_col1.selectbox("Bộ lọc trạng thái:", ["Tất cả", "🔴 Đang nợ", "✅ Đã thanh toán xong"])
+        sort_order = filter_col2.radio("Sắp xếp theo:", ["Mới nhất trước", "Cũ nhất trước"], horizontal=True)
+        
+        st.write("---")
+        
+        # Áp dụng logic lọc dữ liệu
+        display_history = []
+        for i, b in enumerate(st.session_state.history):
+            b_status = b.get('status', 'unpaid')
+            if status_filter == "🔴 Đang nợ" and b_status == 'paid': continue
+            if status_filter == "✅ Đã thanh toán xong" and b_status == 'unpaid': continue
+            display_history.append((i, b)) # Lưu lại index thật để xóa không bị nhầm
+            
+        if sort_order == "Mới nhất trước":
+            display_history = list(reversed(display_history))
+            
+        if not display_history:
+            st.info("Không có hóa đơn nào khớp với bộ lọc của bạn.")
+        
+        # Hiển thị các bill sau khi lọc
+        for real_index, b in display_history:
+            # Nếu bill đã trả xong, hiện thêm chữ (Đã xong) lên tiêu đề cho dễ nhìn
+            is_done_text = " (Đã xong ✅)" if b.get('status') == 'paid' else ""
+            
+            with st.expander(f"[{b['date']}] {b['name']} - {format_vn(b['amount'])}đ{is_done_text}"):
                 p_data_str = ", ".join([f"{k} ({format_vn(v)}đ)" for k,v in b.get('payer_data', {b.get('payer', ''): b.get('amount', 0)}).items()])
                 st.write(f"**Nguồn tiền:** {p_data_str}")
                 for p, amt in b['splits'].items():
                     if amt > 0:
-                        status = "✅ Xong" if p in b.get('paid_by', []) or b['status'] == 'paid' else "🔴 Nợ"
+                        status = "✅ Xong" if p in b.get('paid_by', []) or b.get('status') == 'paid' else "🔴 Nợ"
                         st.write(f"- {p} ăn: {format_vn(amt)}đ ({status})")
                 
                 st.write("---")
+                # Nút bấm giờ sẽ gọi cái Pop-up xác nhận ở trên ra chứ không xóa ngang nữa
                 if st.button(f"🗑️ Xóa bill này", key=f"del_b_{b['id']}", type="primary"):
-                    st.session_state.history.pop(real_index)
-                    save_data()
-                    st.toast("Đã xóa hóa đơn!", icon="✅")
-                    st.rerun()
+                    confirm_delete_bill(real_index, b['name'])
 
 # --- TAB 5: WRAPPED & ANALYTICS ---
 with tab5:
