@@ -14,61 +14,13 @@ st.set_page_config(page_title="Share Bills Super Ultimate", page_icon="💸", la
 
 st.markdown("""
 <style>
-    /* 1. Xóa khoảng trống thừa trên cùng của Streamlit */
-    .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 1.5rem !important;
-        max-width: 1200px;
-    }
-    
-    /* 2. Giấu các UI không cần thiết */
     div[data-testid="InputInstructions"] { display: none !important; }
-    header {visibility: hidden;} /* Giấu thanh header trắng mặc định */
-    footer {visibility: hidden;} /* Giấu footer */
-    
-    /* 3. Tối ưu nút bấm (Nổi bật, bo góc, gradient, hiệu ứng nảy nhẹ khi ấn) */
     button[kind="primary"] {
-        background: linear-gradient(135deg, #ff4b4b, #ff7676) !important;
-        border: none !important;
+        background-color: #ff4b4b !important;
+        border-color: #ff4b4b !important;
         color: white !important;
-        border-radius: 12px !important; /* Bo góc mềm mại hơn */
-        font-weight: 600 !important;
-        transition: transform 0.15s ease, box-shadow 0.15s ease !important;
-        box-shadow: 0 4px 6px rgba(255, 75, 75, 0.2) !important;
     }
-    button[kind="primary"]:hover { 
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 12px rgba(255, 75, 75, 0.3) !important;
-    }
-    button[kind="primary"]:active {
-        transform: translateY(0px) !important;
-    }
-
-    /* 4. Tối ưu khoảng cách các Expander (Thu gọn lại) */
-    div[data-testid="stExpander"] {
-        margin-bottom: 0.5rem !important;
-        border-radius: 10px !important;
-    }
-    div[data-testid="stExpander"] details summary {
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
-    }
-
-    /* 5. Khắc phục lỗi nút bị rớt lề trên điện thoại (Tab 2) */
-    @media (max-width: 768px) {
-        .mobile-margin-fix { display: none !important; } /* Trên mobile cột sẽ tự xếp dọc, giấu cục gạch kê đệm đi */
-        .block-container { padding-left: 1rem !important; padding-right: 1rem !important; }
-    }
-
-    /* 6. Thêm hiệu ứng sinh động cho icon (Rung rinh nhẹ) */
-    @keyframes wiggle {
-        0%, 100% { transform: rotate(-3deg); }
-        50% { transform: rotate(3deg); }
-    }
-    .wiggle-icon {
-        display: inline-block;
-        animation: wiggle 2s ease-in-out infinite;
-    }
+    button[kind="primary"]:hover { background-color: #e03e3e !important; }
 </style>
 """, unsafe_allow_html=True)
 
