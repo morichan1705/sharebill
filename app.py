@@ -542,17 +542,18 @@ with tab3:
                 elif matrix[m2][m1] > matrix[m1][m2] and (matrix[m2][m1] - matrix[m1][m2]) > 1: found_netting = True
 
 
+       # ==========================================
+        # MỤC 2: COPY TIN NHẮN (Thu gọn bằng Expander)
         # ==========================================
-        # MỤC 2: COPY TIN NHẮN (Luôn hiển thị)
-        # ==========================================
-        st.write("---")
-        st.subheader("📋 Copy tin nhắn gửi nhóm")
-        if use_netting:
-            st.code(msg_netting, language="text")
-        else:
-            st.code(msg_raw, language="text")
+        st.divider()
+        # Dùng st.expander thay vì st.markdown để tạo hộp thoại đóng/mở
+        with st.expander("📋 Nhấn vào đây để copy tin nhắn gửi đòi nợ"):
+            if use_netting: 
+                st.code(msg_netting, language="text")
+            else: 
+                st.code(msg_raw, language="text")
             
-        st.write("---")
+        st.divider()
         
         # ==========================================
         # MỤC 3: DANH SÁCH NỢ & THANH TOÁN
