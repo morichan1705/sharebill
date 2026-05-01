@@ -783,8 +783,10 @@ with tab2:
     b_cons = st.multiselect("Danh sách ăn:", def_m, default=def_m, format_func=get_name)
 
     if b_cons and total_bill > 0:
-        method = st.radio("Cách chia tiền ăn:", ["Chia đều ✂️", "Chia theo món lẻ 🍽️"], horizontal=True)
+        # ĐÃ THÊM: Option Chia theo % và Số tiền cụ thể
+        method = st.radio("Cách chia tiền ăn:", ["Chia đều ✂️", "Theo tỉ lệ (%) 📊", "Số tiền cụ thể 💰", "Chia theo món lẻ 🍽️"], horizontal=True)
         splits = {c: 0 for c in b_cons}
+        
         if "món lẻ" in method and st.session_state.current_items:
             pool = 0
             for idx, it in enumerate(st.session_state.current_items):
@@ -796,6 +798,25 @@ with tab2:
                     pool += it["price"] * it["qty"]
             if pool > 0:
                 for c in b_cons: splits[c] += pool / len(b_cons)
+                
+        # XỬ LÝ CHIA THEO TỈ LỆ (%)
+        elif "tỉ lệ" in method:
+            st.caption("Nhập phần trăm cho mỗi người (Tổng nên là 100%):")
+            cols = st.columns(len(b_cons))
+            for i, c in enumerate(b_cons):
+                # Dùng key khác với key của người trả tiền (c_pct_ thay vì pct_)
+                pct = cols[i].number_input(f"% {get_pure_name(c)}", 0, 100, 0, key=f"c_pct_{c}")
+                splits[c] = (pct / 100) * total_bill
+                
+        # XỬ LÝ CHIA THEO SỐ TIỀN CỤ THỂ
+        elif "cụ thể" in method:
+            st.caption(f"Nhập số tiền cụ thể (Tổng cần khớp: {format_vn(total_bill)}đ):")
+            cols = st.columns(len(b_cons))
+            for i, c in enumerate(b_cons):
+                # Dùng key khác với key của người trả tiền (c_amt_ thay vì amt_)
+                splits[c] = cols[i].number_input(f"{get_pure_name(c)} ăn", 0, step=1000, key=f"c_amt_{c}")
+                
+        # CHIA ĐỀU (Mặc định)
         else:
             for c in b_cons: splits[c] = total_bill / len(b_cons)
 
@@ -807,6 +828,11 @@ with tab2:
                 st.error("😅 Chưa chọn người trả tiền!")
             elif abs(sum(payer_data.values()) - total_bill) > 1:
                 st.error(f"😵 Tổng ứng ({format_vn(sum(payer_data.values()))}đ) lệch với tổng bill ({format_vn(total_bill)}đ)!")
+            
+            # ĐÃ THÊM: Kiểm tra tổng tiền ăn có khớp với tổng bill không
+            elif abs(sum(splits.values()) - total_bill) > 1:
+                st.error(f"😵 Tổng tiền ăn được chia ({format_vn(sum(splits.values()))}đ) đang lệch với tổng bill ({format_vn(total_bill)}đ)! Bạn kiểm tra lại tỉ lệ/số tiền nhé.")
+            
             else:
                 st.session_state.history.append({
                     "id": time.time(), "date": b_date, "deadline": b_deadline,
@@ -822,7 +848,6 @@ with tab2:
                 st.success("🎉 Đã lưu rồi nha! Nhớ đòi nợ đúng hạn nhé~")
                 time.sleep(1.5)
                 st.rerun()
-
 # ════════════════════════════════════════════
 #  TAB 3 – CHỐT SỔ
 # ════════════════════════════════════════════
