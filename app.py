@@ -309,14 +309,57 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-if st.sidebar.button("🚪 Đg xuất", use_container_width=True):
+# --- TÍNH NĂNG ĐỔI MẬT KHẨU & CÂU HỎI BÍ MẬT TẠI SIDEBAR ---
+with st.sidebar.expander("⚙️ Đổi mật khẩu & Bảo mật"):
+    s_old_p = st.text_input("Mật khẩu hiện tại (*):", type="password", placeholder="Nhập để xác thực...")
+    s_new_p = st.text_input("Mật khẩu mới:", type="password", placeholder="Bỏ trống nếu không đổi")
+    
+    st.markdown("<div style='font-size:0.9rem; margin-top:10px; margin-bottom:5px;'><b>🔒 Câu hỏi bí mật mới</b></div>", unsafe_allow_html=True)
+    SEC_QUESTIONS = [
+        "Món ăn yêu thích nhất của nhóm là gì?",
+        "Tên thú cưng đầu tiên của bạn?",
+        "Biệt danh hồi nhỏ của bạn là gì?",
+        "Quán quen nhóm hay ngồi tên gì?"
+    ]
+    s_sec_q = st.selectbox("Chọn câu hỏi:", SEC_QUESTIONS, label_visibility="collapsed")
+    s_sec_a = st.text_input("Câu trả lời mới:", placeholder="Bỏ trống nếu không đổi")
+    
+    if st.button("💾 Lưu bảo mật", type="primary", use_container_width=True):
+        if not s_old_p:
+            st.warning("⚠️ Nhập mật khẩu hiện tại để xác thực nhé!")
+        else:
+            user_data = get_user_from_db(my_id)
+            if user_data and user_data["password"] == s_old_p:
+                updates = {}
+                # Cập nhật pass nếu có nhập pass mới
+                if s_new_p: 
+                    updates["password"] = s_new_p
+                
+                # Cập nhật câu hỏi bí mật nếu có nhập câu trả lời mới
+                if s_sec_a:
+                    app_data = user_data.get("app_data", {})
+                    if "security" not in app_data: app_data["security"] = {}
+                    app_data["security"]["q"] = s_sec_q
+                    app_data["security"]["a"] = s_sec_a.strip().lower()
+                    updates["app_data"] = app_data
+                
+                if updates:
+                    supabase.table("users").update(updates).eq("username", my_id).execute()
+                    st.success("✅ Cập nhật bảo mật thành công!")
+                else:
+                    st.info("Bạn chưa thay đổi thông tin gì~")
+            else:
+                st.error("❌ Mật khẩu hiện tại không đúng!")
+
+st.sidebar.divider()
+
+if st.sidebar.button("🚪 Đăng xuất", use_container_width=True):
     # Xoá toàn bộ data của user cũ khỏi session để user mới không thấy
     for _k in ["members", "groups", "history", "friend_page", "group_page",
                "current_items", "ai_date", "show_qr", "data_owner"]:
         st.session_state.pop(_k, None)
     st.session_state.update(logged_in=False, username="", nickname="")
     st.rerun()
-
 
 def load_data():
     user_data = get_user_from_db(st.session_state.username)
@@ -434,8 +477,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 with tab1:
     # ── Thông tin cá nhân ──
     st.markdown("### 👤 Thông tin của bạn")
-    with st.expander("⚙️ Chỉnh sửa thông tin & Bảo mật"):
-        # Chỉnh sửa thông tin chung
+    with st.expander("⚙️ Chỉnh sửa thông tin cá nhân"):
         c0, c1, c2 = st.columns(3)
         edit_my_name = c0.text_input("Tên hiển thị:", value=st.session_state.members[my_id].get("name", st.session_state.nickname))
         edit_my_bank = c1.selectbox("Ngân hàng:", BANK_LIST, index=_bank_idx(st.session_state.members[my_id].get("bank", "")))
@@ -447,26 +489,7 @@ with tab1:
             save_data()
             st.toast("✅ Đã lưu thông tin!", icon="🌸")
             st.rerun()
-        
-        st.divider()
-        
-        # --- CÁCH 1: TÍNH NĂNG ĐỔI MẬT KHẨU KHI ĐANG ĐĂNG NHẬP ---
-        st.markdown("#### 🔑 Đổi mật khẩu")
-        col_p1, col_p2 = st.columns(2)
-        old_pass = col_p1.text_input("Mật khẩu hiện tại:", type="password", key="old_p")
-        new_pass = col_p2.text_input("Mật khẩu mới:", type="password", key="new_p")
-        
-        if st.button("Cập nhật mật khẩu"):
-            user_data = get_user_from_db(my_id)
-            if user_data and user_data["password"] == old_pass:
-                if new_pass:
-                    supabase.table("users").update({"password": new_pass}).eq("username", my_id).execute()
-                    st.success("✅ Đã đổi mật khẩu thành công! Nhớ kỹ đừng quên nha~")
-                else:
-                    st.warning("Bạn chưa nhập mật khẩu mới kìa!")
-            else:
-                st.error("❌ Mật khẩu hiện tại không đúng!")
-
+            
     st.divider()
 
     # ── Bạn bè ──
