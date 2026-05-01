@@ -24,12 +24,19 @@ html, body, [class*="css"] {
     font-family: 'Nunito', sans-serif !important;
 }
 
+/* ── Nền tổng thể ── */
+.stApp {
+    background: linear-gradient(135deg, #fff5f5 0%, #fff0fb 50%, #f0f4ff 100%) !important;
+    background-attachment: fixed !important;
+}
+
 /* ── Ẩn footer Streamlit ── */
 footer { visibility: hidden; }
 div[data-testid="InputInstructions"] { display: none !important; }
 
 /* ── Metric card – pastel glow ── */
 div[data-testid="stMetric"] {
+    background: white;
     border-radius: 20px;
     padding: 1rem 1.25rem;
     box-shadow: 0 4px 18px rgba(255, 120, 130, 0.10);
@@ -43,6 +50,7 @@ div[data-testid="stMetric"]:hover {
 
 /* ── PRIMARY button ── */
 button[kind="primary"] {
+    background: linear-gradient(135deg, #ff6b81, #ff4b4b) !important;
     border: none !important;
     color: white !important;
     border-radius: 50px !important;
@@ -69,6 +77,7 @@ button[kind="secondary"]:hover { transform: translateY(-1px) !important; }
 
 /* ── Tab bar ── */
 div[data-baseweb="tab-list"] {
+    background: rgba(255,255,255,0.7);
     border-radius: 50px;
     padding: 4px 6px;
     gap: 4px;
@@ -82,6 +91,7 @@ div[data-baseweb="tab"] {
     transition: background 0.2s ease !important;
 }
 div[aria-selected="true"][data-baseweb="tab"] {
+    background: linear-gradient(135deg, #ff6b81, #ff4b4b) !important;
     color: white !important;
 }
 
@@ -89,6 +99,7 @@ div[aria-selected="true"][data-baseweb="tab"] {
 div[data-testid="stExpander"] {
     border-radius: 16px !important;
     border: 1.5px solid rgba(255,107,129,0.18) !important;
+    background: rgba(255,255,255,0.85) !important;
     backdrop-filter: blur(6px);
     margin-bottom: 0.6rem !important;
     overflow: hidden;
@@ -118,12 +129,14 @@ div[data-baseweb="input"] > div:focus-within {
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-radius: 20px !important;
     border: 1.5px solid rgba(255,107,129,0.15) !important;
+    background: rgba(255,255,255,0.9) !important;
     padding: 0.5rem;
     box-shadow: 0 4px 16px rgba(255,107,129,0.08);
 }
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #fff0f3 0%, #f8f0ff 100%) !important;
     border-right: 1.5px solid rgba(255,107,129,0.15) !important;
 }
 
@@ -138,6 +151,7 @@ div[data-testid="stToast"] {
 hr {
     border: none !important;
     height: 2px !important;
+    background: linear-gradient(90deg, transparent, rgba(255,107,129,0.3), transparent) !important;
     margin: 1rem 0 !important;
 }
 
@@ -266,6 +280,10 @@ st.sidebar.markdown(f"""
 """, unsafe_allow_html=True)
 
 if st.sidebar.button("🚪 Đăng xuất", use_container_width=True):
+    # Xoá toàn bộ data của user cũ khỏi session để user mới không thấy
+    for _k in ["members", "groups", "history", "friend_page", "group_page",
+               "current_items", "ai_date", "show_qr", "data_owner"]:
+        st.session_state.pop(_k, None)
     st.session_state.update(logged_in=False, username="", nickname="")
     st.rerun()
 
@@ -318,8 +336,9 @@ def save_data():
     }).eq("username", st.session_state.username).execute()
 
 
-if "members" not in st.session_state:
+if "members" not in st.session_state or st.session_state.get("data_owner") != my_id:
     load_data()
+    st.session_state.data_owner = my_id
 
 # Đảm bảo bản thân luôn có trong danh bạ
 if my_id not in st.session_state.members:
@@ -776,6 +795,9 @@ with tab3:
                     if not any(v < -1 for v in remaining.values()): b["status"] = "paid"
             save_data(); st.rerun()
 
+        if "show_qr" not in st.session_state:
+            st.session_state.show_qr = set()
+
         if not use_netting:
             st.subheader("📜 Chi tiết nợ (chưa bù trừ)")
             for (debtor, creditor), items in debts_dict.items():
@@ -783,8 +805,15 @@ with tab3:
                 with st.expander(f"🔴 **{get_pure_name(debtor)}** nợ **{get_pure_name(creditor)}**: {format_vn(total_owed)}đ"):
                     for item in items: st.write(f"- {item['date']} · {item['name']} · **{format_vn(item['amount'])}đ**")
                     c_info_m = st.session_state.members.get(creditor, {})
+                    _qr_key = f"qr_raw_{debtor}_{creditor}"
                     if c_info_m.get("bank") and c_info_m.get("acc"):
-                        st.image(f"https://img.vietqr.io/image/{c_info_m['bank']}-{c_info_m['acc']}-compact2.png?amount={int(total_owed)}", width=250)
+                        if _qr_key in st.session_state.show_qr:
+                            st.image(f"https://img.vietqr.io/image/{c_info_m['bank']}-{c_info_m['acc']}-compact2.png?amount={int(total_owed)}", width=250)
+                            if st.button("🙈 Ẩn QR", key=f"hide_{_qr_key}"):
+                                st.session_state.show_qr.discard(_qr_key); st.rerun()
+                        else:
+                            if st.button("📱 Tạo QR chuyển khoản", key=f"show_{_qr_key}"):
+                                st.session_state.show_qr.add(_qr_key); st.rerun()
                     if st.button("✅ Xác nhận đã chuyển khoản!", key=f"p_{debtor}_{creditor}", type="primary"):
                         _mark_paid(debtor, items)
         else:
@@ -807,8 +836,15 @@ with tab3:
                             any_shown = True
                             with st.expander(f"👉 **{get_pure_name(m1)}** → **{get_pure_name(m2)}**: {format_vn(net_amt)}đ"):
                                 ci = st.session_state.members.get(m2, {})
+                                _qk = f"qr_net_{m1}_{m2}"
                                 if ci.get("bank") and ci.get("acc"):
-                                    st.image(f"https://img.vietqr.io/image/{ci['bank']}-{ci['acc']}-compact2.png?amount={int(net_amt)}", width=250)
+                                    if _qk in st.session_state.show_qr:
+                                        st.image(f"https://img.vietqr.io/image/{ci['bank']}-{ci['acc']}-compact2.png?amount={int(net_amt)}", width=250)
+                                        if st.button("🙈 Ẩn QR", key=f"hide_{_qk}"):
+                                            st.session_state.show_qr.discard(_qk); st.rerun()
+                                    else:
+                                        if st.button("📱 Tạo QR chuyển khoản", key=f"show_{_qk}"):
+                                            st.session_state.show_qr.add(_qk); st.rerun()
                                 if st.button("✅ Xác nhận đã chuyển!", key=f"n_{m1}_{m2}", type="primary"):
                                     _mark_paid(m1, details[m1][m2])
                     elif raw21 > raw12:
@@ -817,8 +853,15 @@ with tab3:
                             any_shown = True
                             with st.expander(f"👉 **{get_pure_name(m2)}** → **{get_pure_name(m1)}**: {format_vn(net_amt)}đ"):
                                 ci = st.session_state.members.get(m1, {})
+                                _qk = f"qr_net_{m2}_{m1}"
                                 if ci.get("bank") and ci.get("acc"):
-                                    st.image(f"https://img.vietqr.io/image/{ci['bank']}-{ci['acc']}-compact2.png?amount={int(net_amt)}", width=250)
+                                    if _qk in st.session_state.show_qr:
+                                        st.image(f"https://img.vietqr.io/image/{ci['bank']}-{ci['acc']}-compact2.png?amount={int(net_amt)}", width=250)
+                                        if st.button("🙈 Ẩn QR", key=f"hide_{_qk}"):
+                                            st.session_state.show_qr.discard(_qk); st.rerun()
+                                    else:
+                                        if st.button("📱 Tạo QR chuyển khoản", key=f"show_{_qk}"):
+                                            st.session_state.show_qr.add(_qk); st.rerun()
                                 if st.button("✅ Xác nhận đã chuyển!", key=f"n_{m2}_{m1}", type="primary"):
                                     _mark_paid(m2, details[m2][m1])
 
