@@ -24,11 +24,6 @@ html, body, [class*="css"] {
     font-family: 'Nunito', sans-serif !important;
 }
 
-/* ── Nền tổng thể ── */
-.stApp {
-    /* Đã xoá background */
-}
-
 /* ── Ẩn footer Streamlit ── */
 footer { visibility: hidden; }
 div[data-testid="InputInstructions"] { display: none !important; }
@@ -48,8 +43,8 @@ div[data-testid="stMetric"]:hover {
 
 /* ── PRIMARY button ── */
 button[kind="primary"] {
-    border: 1.5px solid #ff6b81 !important; /* Thêm viền để thấy nút */
-    color: #ff6b81 !important; /* Đổi màu chữ để không bị chìm vào nền */
+    border: none !important;
+    color: white !important;
     border-radius: 50px !important;
     font-weight: 700 !important;
     font-family: 'Nunito', sans-serif !important;
@@ -84,9 +79,10 @@ div[data-baseweb="tab"] {
     border-radius: 40px !important;
     font-weight: 600 !important;
     font-family: 'Nunito', sans-serif !important;
+    transition: background 0.2s ease !important;
 }
 div[aria-selected="true"][data-baseweb="tab"] {
-    color: #ff6b81 !important; /* Đổi màu chữ thành hồng khi được chọn */
+    color: white !important;
 }
 
 /* ── Expander ── */
@@ -140,13 +136,9 @@ div[data-testid="stToast"] {
 
 /* ── Divider ── */
 hr {
-    border-top: 2px solid rgba(255,107,129,0.3) !important; /* Dùng viền để tạo đường kẻ */
-    border-bottom: none !important;
-    border-left: none !important;
-    border-right: none !important;
-    background: transparent !important;
+    border: none !important;
+    height: 2px !important;
     margin: 1rem 0 !important;
-    height: 0 !important;
 }
 
 /* ── Animations ── */
