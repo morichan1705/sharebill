@@ -438,15 +438,22 @@ with tab1:
                 emv = _parse_emv(raw)
                 bank_code, acc_no = "", ""
                 acc_name = emv.get("59", "").strip()
+                
                 for tag in ("38", "26", "27"):
                     if tag in emv:
-                        sub  = _parse_emv(emv[tag])
-                        _bin = sub.get("01", "")
-                        _acc = sub.get("02", "")
-                        if _bin and _acc:
-                            bank_code = _BIN_MAP.get(_bin, "")
-                            acc_no    = _acc
-                            break
+                        sub = _parse_emv(emv[tag])
+                        # Kiểm tra xem có đúng định dạng Napas VietQR (GUID: A000000727) không
+                        if sub.get("00") == "A000000727":
+                            # Thông tin BIN và STK nằm lồng tiếp bên trong Tag 01
+                            if "01" in sub:
+                                sub_01 = _parse_emv(sub["01"])
+                                _bin = sub_01.get("00", "")  # Đây mới là mã Ngân hàng (BIN)
+                                _acc = sub_01.get("01", "")  # Đây mới là Số tài khoản
+                                
+                                if _bin and _acc:
+                                    bank_code = _BIN_MAP.get(_bin, "")
+                                    acc_no    = _acc
+                                    break
                 return bank_code, acc_no, acc_name
 
             def _try_decode_qr(pil_img):
