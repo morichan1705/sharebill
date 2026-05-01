@@ -432,44 +432,51 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 #  TAB 1 – DANH BẠ & NHÓM
 # ════════════════════════════════════════════
 with tab1:
-        # ── Thông tin cá nhân ──
-        st.markdown("### 👤 Thông tin của bạn")
-        with st.expander("⚙️ Chỉnh sửa thông tin & Bảo mật"):
-            # Chỉnh sửa thông tin chung
-            c0, c1, c2 = st.columns(3)
-            edit_my_name = c0.text_input("Tên hiển thị:", value=st.session_state.members[my_id].get("name", st.session_state.nickname))
-            edit_my_bank = c1.selectbox("Ngân hàng:", BANK_LIST, index=_bank_idx(st.session_state.members[my_id].get("bank", "")))
-            edit_my_acc = c2.text_input("Số tài khoản:", value=st.session_state.members[my_id].get("acc", ""))
-            
-            if st.button("💾 Cập nhật thông tin", type="primary"):
-                st.session_state.members[my_id] = {"name": edit_my_name, "bank": edit_my_bank, "acc": edit_my_acc}
-                st.session_state.nickname = edit_my_name
-                save_data()
-                st.toast("✅ Đã lưu thông tin!", icon="🌸")
-                st.rerun()
-            
-            st.divider()
-            
-            # --- CÁCH 1: TÍNH NĂNG ĐỔI MẬT KHẨU KHI ĐANG ĐĂNG NHẬP ---
-            st.markdown("#### 🔑 Đổi mật khẩu")
-            col_p1, col_p2 = st.columns(2)
-            old_pass = col_p1.text_input("Mật khẩu hiện tại:", type="password", key="old_p")
-            new_pass = col_p2.text_input("Mật khẩu mới:", type="password", key="new_p")
-            
-            if st.button("Cập nhật mật khẩu"):
-                user_data = get_user_from_db(my_id)
-                if user_data and user_data["password"] == old_pass:
-                    if new_pass:
-                        supabase.table("users").update({"password": new_pass}).eq("username", my_id).execute()
-                        st.success("✅ Đã đổi mật khẩu thành công! Nhớ kỹ đừng quên nha~")
-                    else:
-                        st.warning("Bạn chưa nhập mật khẩu mới kìa!")
+    # ── Thông tin cá nhân ──
+    st.markdown("### 👤 Thông tin của bạn")
+    with st.expander("⚙️ Chỉnh sửa thông tin & Bảo mật"):
+        # Chỉnh sửa thông tin chung
+        c0, c1, c2 = st.columns(3)
+        edit_my_name = c0.text_input("Tên hiển thị:", value=st.session_state.members[my_id].get("name", st.session_state.nickname))
+        edit_my_bank = c1.selectbox("Ngân hàng:", BANK_LIST, index=_bank_idx(st.session_state.members[my_id].get("bank", "")))
+        edit_my_acc = c2.text_input("Số tài khoản:", value=st.session_state.members[my_id].get("acc", ""))
+        
+        if st.button("💾 Cập nhật thông tin", type="primary"):
+            st.session_state.members[my_id] = {"name": edit_my_name, "bank": edit_my_bank, "acc": edit_my_acc}
+            st.session_state.nickname = edit_my_name
+            save_data()
+            st.toast("✅ Đã lưu thông tin!", icon="🌸")
+            st.rerun()
+        
+        st.divider()
+        
+        # --- CÁCH 1: TÍNH NĂNG ĐỔI MẬT KHẨU KHI ĐANG ĐĂNG NHẬP ---
+        st.markdown("#### 🔑 Đổi mật khẩu")
+        col_p1, col_p2 = st.columns(2)
+        old_pass = col_p1.text_input("Mật khẩu hiện tại:", type="password", key="old_p")
+        new_pass = col_p2.text_input("Mật khẩu mới:", type="password", key="new_p")
+        
+        if st.button("Cập nhật mật khẩu"):
+            user_data = get_user_from_db(my_id)
+            if user_data and user_data["password"] == old_pass:
+                if new_pass:
+                    supabase.table("users").update({"password": new_pass}).eq("username", my_id).execute()
+                    st.success("✅ Đã đổi mật khẩu thành công! Nhớ kỹ đừng quên nha~")
                 else:
-                    st.error("❌ Mật khẩu hiện tại không đúng!")
-                    
-        # ── Bạn bè ──
-        st.markdown("### 👥 Bạn bè của bạn")
-        c_add, c_list = st.columns([1, 1.5], gap="large") # Dòng này đã được lùi ra cho thẳng hàng với st.markdown
+                    st.warning("Bạn chưa nhập mật khẩu mới kìa!")
+            else:
+                st.error("❌ Mật khẩu hiện tại không đúng!")
+
+    st.divider()
+
+    # ── Bạn bè ──
+    st.markdown("### 👥 Bạn bè của bạn")
+    c_add, c_list = st.columns([1, 1.5], gap="large")
+
+    # --- ĐÃ THÊM LẠI KHỐI `with c_add:` BỊ THIẾU Ở ĐÂY ---
+    with c_add:
+        st.markdown("#### ➕ Kết bạn mới")
+        with st.container(border=True):
 
             # ── QR SCAN HELPERS ─────────────────────────────────────
             _BIN_MAP = {
@@ -501,13 +508,11 @@ with tab1:
                 for tag in ("38", "26", "27"):
                     if tag in emv:
                         sub = _parse_emv(emv[tag])
-                        # Kiểm tra xem có đúng định dạng Napas VietQR (GUID: A000000727) không
                         if sub.get("00") == "A000000727":
-                            # Thông tin BIN và STK nằm lồng tiếp bên trong Tag 01
                             if "01" in sub:
                                 sub_01 = _parse_emv(sub["01"])
-                                _bin = sub_01.get("00", "")  # Đây mới là mã Ngân hàng (BIN)
-                                _acc = sub_01.get("01", "")  # Đây mới là Số tài khoản
+                                _bin = sub_01.get("00", "") 
+                                _acc = sub_01.get("01", "") 
                                 
                                 if _bin and _acc:
                                     bank_code = _BIN_MAP.get(_bin, "")
@@ -567,7 +572,6 @@ with tab1:
             ):
                 st.session_state.qr_scan_open = not st.session_state.qr_scan_open
                 if not st.session_state.qr_scan_open:
-                    # Dọn dẹp session state nếu người dùng chủ động đóng
                     for _k in ("nf_name", "nf_bank", "nf_acc"): st.session_state.pop(_k, None)
                 st.rerun()
 
@@ -578,7 +582,6 @@ with tab1:
                     unsafe_allow_html=True,
                 )
                 
-                # CHỈ CÒN TẢI ẢNH LÊN
                 _qr_img_raw = st.file_uploader("Tải ảnh QR:", type=["jpg","png","jpeg","webp"], key="qr_file_input", label_visibility="collapsed")
 
                 if _qr_img_raw:
@@ -601,9 +604,7 @@ with tab1:
                                     st.session_state["nf_bank"] = _bank
                                     st.session_state["nf_acc"]  = _acc
                                     
-                                    # ÉP ĐÓNG PANEL NGAY LẬP TỨC ĐỂ CẮT VÒNG LẶP FILE UPLOADER
                                     st.session_state.qr_scan_open = False
-                                    
                                     st.toast("✅ Đọc QR thành công! Kiểm tra form bên dưới nha~", icon="🎉")
                                     st.rerun()
                                 else:
@@ -613,7 +614,6 @@ with tab1:
                         except Exception as _e:
                             st.error(f"😵 Lỗi: {_e}")
 
-            # Hiển thị thông báo màu xanh báo thành công nếu có dữ liệu từ QR
             if st.session_state.get("nf_bank") or st.session_state.get("nf_acc"):
                 st.success(
                     f"✅ **{st.session_state.get('nf_bank') or '(không rõ ngân hàng)'}** · "
@@ -635,7 +635,6 @@ with tab1:
                     st.session_state.members[new_id] = {
                         "name": new_f_name.strip(), "bank": new_f_bank, "acc": new_f_acc.strip()
                     }
-                    # Dọn dẹp session state sau khi lưu thành công
                     for _k in ("nf_name","nf_bank","nf_acc","qr_scan_open"): st.session_state.pop(_k, None)
                     save_data()
                     st.toast(f"🎉 Đã thêm {new_f_name}!", icon="✨")
