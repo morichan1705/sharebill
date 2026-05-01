@@ -26,8 +26,7 @@ html, body, [class*="css"] {
 
 /* ── Nền tổng thể ── */
 .stApp {
-    background: linear-gradient(135deg, #fff5f5 0%, #fff0fb 50%, #f0f4ff 100%) !important;
-    background-attachment: fixed !important;
+    /* Đã xoá background */
 }
 
 /* ── Ẩn footer Streamlit ── */
@@ -36,7 +35,6 @@ div[data-testid="InputInstructions"] { display: none !important; }
 
 /* ── Metric card – pastel glow ── */
 div[data-testid="stMetric"] {
-    background: white;
     border-radius: 20px;
     padding: 1rem 1.25rem;
     box-shadow: 0 4px 18px rgba(255, 120, 130, 0.10);
@@ -50,9 +48,8 @@ div[data-testid="stMetric"]:hover {
 
 /* ── PRIMARY button ── */
 button[kind="primary"] {
-    background: linear-gradient(135deg, #ff6b81, #ff4b4b) !important;
-    border: none !important;
-    color: white !important;
+    border: 1.5px solid #ff6b81 !important; /* Thêm viền để thấy nút */
+    color: #ff6b81 !important; /* Đổi màu chữ để không bị chìm vào nền */
     border-radius: 50px !important;
     font-weight: 700 !important;
     font-family: 'Nunito', sans-serif !important;
@@ -77,7 +74,6 @@ button[kind="secondary"]:hover { transform: translateY(-1px) !important; }
 
 /* ── Tab bar ── */
 div[data-baseweb="tab-list"] {
-    background: rgba(255,255,255,0.7);
     border-radius: 50px;
     padding: 4px 6px;
     gap: 4px;
@@ -88,18 +84,15 @@ div[data-baseweb="tab"] {
     border-radius: 40px !important;
     font-weight: 600 !important;
     font-family: 'Nunito', sans-serif !important;
-    transition: background 0.2s ease !important;
 }
 div[aria-selected="true"][data-baseweb="tab"] {
-    background: linear-gradient(135deg, #ff6b81, #ff4b4b) !important;
-    color: white !important;
+    color: #ff6b81 !important; /* Đổi màu chữ thành hồng khi được chọn */
 }
 
 /* ── Expander ── */
 div[data-testid="stExpander"] {
     border-radius: 16px !important;
     border: 1.5px solid rgba(255,107,129,0.18) !important;
-    background: rgba(255,255,255,0.85) !important;
     backdrop-filter: blur(6px);
     margin-bottom: 0.6rem !important;
     overflow: hidden;
@@ -129,14 +122,12 @@ div[data-baseweb="input"] > div:focus-within {
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-radius: 20px !important;
     border: 1.5px solid rgba(255,107,129,0.15) !important;
-    background: rgba(255,255,255,0.9) !important;
     padding: 0.5rem;
     box-shadow: 0 4px 16px rgba(255,107,129,0.08);
 }
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #fff0f3 0%, #f8f0ff 100%) !important;
     border-right: 1.5px solid rgba(255,107,129,0.15) !important;
 }
 
@@ -149,10 +140,13 @@ div[data-testid="stToast"] {
 
 /* ── Divider ── */
 hr {
-    border: none !important;
-    height: 2px !important;
-    background: linear-gradient(90deg, transparent, rgba(255,107,129,0.3), transparent) !important;
+    border-top: 2px solid rgba(255,107,129,0.3) !important; /* Dùng viền để tạo đường kẻ */
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    background: transparent !important;
     margin: 1rem 0 !important;
+    height: 0 !important;
 }
 
 /* ── Animations ── */
