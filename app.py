@@ -24,19 +24,12 @@ html, body, [class*="css"] {
     font-family: 'Nunito', sans-serif !important;
 }
 
-/* ── Nền tổng thể ── */
-.stApp {
-    background: linear-gradient(135deg, #fff5f5 0%, #fff0fb 50%, #f0f4ff 100%) !important;
-    background-attachment: fixed !important;
-}
-
 /* ── Ẩn footer Streamlit ── */
 footer { visibility: hidden; }
 div[data-testid="InputInstructions"] { display: none !important; }
 
 /* ── Metric card – pastel glow ── */
 div[data-testid="stMetric"] {
-    background: white;
     border-radius: 20px;
     padding: 1rem 1.25rem;
     box-shadow: 0 4px 18px rgba(255, 120, 130, 0.10);
@@ -50,7 +43,6 @@ div[data-testid="stMetric"]:hover {
 
 /* ── PRIMARY button ── */
 button[kind="primary"] {
-    background: linear-gradient(135deg, #ff6b81, #ff4b4b) !important;
     border: none !important;
     color: white !important;
     border-radius: 50px !important;
@@ -77,7 +69,6 @@ button[kind="secondary"]:hover { transform: translateY(-1px) !important; }
 
 /* ── Tab bar ── */
 div[data-baseweb="tab-list"] {
-    background: rgba(255,255,255,0.7);
     border-radius: 50px;
     padding: 4px 6px;
     gap: 4px;
@@ -91,7 +82,6 @@ div[data-baseweb="tab"] {
     transition: background 0.2s ease !important;
 }
 div[aria-selected="true"][data-baseweb="tab"] {
-    background: linear-gradient(135deg, #ff6b81, #ff4b4b) !important;
     color: white !important;
 }
 
@@ -99,7 +89,6 @@ div[aria-selected="true"][data-baseweb="tab"] {
 div[data-testid="stExpander"] {
     border-radius: 16px !important;
     border: 1.5px solid rgba(255,107,129,0.18) !important;
-    background: rgba(255,255,255,0.85) !important;
     backdrop-filter: blur(6px);
     margin-bottom: 0.6rem !important;
     overflow: hidden;
@@ -129,14 +118,12 @@ div[data-baseweb="input"] > div:focus-within {
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-radius: 20px !important;
     border: 1.5px solid rgba(255,107,129,0.15) !important;
-    background: rgba(255,255,255,0.9) !important;
     padding: 0.5rem;
     box-shadow: 0 4px 16px rgba(255,107,129,0.08);
 }
 
 /* ── Sidebar ── */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #fff0f3 0%, #f8f0ff 100%) !important;
     border-right: 1.5px solid rgba(255,107,129,0.15) !important;
 }
 
@@ -151,7 +138,6 @@ div[data-testid="stToast"] {
 hr {
     border: none !important;
     height: 2px !important;
-    background: linear-gradient(90deg, transparent, rgba(255,107,129,0.3), transparent) !important;
     margin: 1rem 0 !important;
 }
 
@@ -464,27 +450,16 @@ with tab1:
                 return bank_code, acc_no, acc_name
 
             def _try_decode_qr(pil_img):
-                """
-                Thử decode QR với nhiều cách xử lý ảnh khác nhau.
-                Trả về chuỗi QR hoặc None nếu thất bại.
-                """
                 from pyzbar.pyzbar import decode as _pyz
                 from PIL import ImageEnhance, ImageFilter, ImageOps
 
                 attempts = []
-
-                # 1. Ảnh gốc RGB
                 attempts.append(pil_img.convert("RGB"))
-                # 2. Grayscale
                 attempts.append(pil_img.convert("L"))
-                # 3. Grayscale + tăng contrast mạnh
                 gray = pil_img.convert("L")
                 attempts.append(ImageEnhance.Contrast(gray).enhance(3.0))
-                # 4. Autocontrast (cân bằng histogram tự động)
                 attempts.append(ImageOps.autocontrast(gray, cutoff=2))
-                # 5. Sharpen
                 attempts.append(gray.filter(ImageFilter.SHARPEN))
-                # 6. Scale lớn hơn (giúp QR nhỏ trong ảnh)
                 w, h = pil_img.size
                 if max(w, h) < 1000:
                     big = pil_img.convert("L").resize((w*2, h*2))
@@ -526,21 +501,19 @@ with tab1:
             ):
                 st.session_state.qr_scan_open = not st.session_state.qr_scan_open
                 if not st.session_state.qr_scan_open:
-                    for _k in ("qr_bank", "qr_acc", "qr_name"): st.session_state.pop(_k, None)
+                    # Dọn dẹp session state nếu người dùng chủ động đóng
+                    for _k in ("nf_name", "nf_bank", "nf_acc"): st.session_state.pop(_k, None)
                 st.rerun()
 
             if st.session_state.qr_scan_open:
                 st.markdown(
                     "<div style='font-size:0.8rem;color:#aaa;margin-bottom:4px;'>"
-                    "📌 Chụp / tải ảnh QR VietQR từ app ngân hàng của bạn bè</div>",
+                    "📌 Tải ảnh QR VietQR từ app ngân hàng của bạn bè lên đây:</div>",
                     unsafe_allow_html=True,
                 )
-                _qr_src = st.radio("Nguồn ảnh:", ["📷 Camera", "🖼️ Upload file"], horizontal=True, key="qr_src_radio")
-                _qr_img_raw = (
-                    st.camera_input("Chụp mã QR:", key="qr_cam_input", label_visibility="collapsed")
-                    if "Camera" in _qr_src
-                    else st.file_uploader("Tải ảnh QR:", type=["jpg","png","jpeg","webp"], key="qr_file_input", label_visibility="collapsed")
-                )
+                
+                # CHỈ CÒN TẢI ẢNH LÊN
+                _qr_img_raw = st.file_uploader("Tải ảnh QR:", type=["jpg","png","jpeg","webp"], key="qr_file_input", label_visibility="collapsed")
 
                 if _qr_img_raw:
                     with st.spinner("🔍 Đang đọc mã QR... thử vài cách nha~"):
@@ -554,16 +527,17 @@ with tab1:
                             else:
                                 _bank, _acc, _name = _decode_vietqr(_raw)
 
-                                # Nếu chưa có tên → thử gọi API
                                 if not _name and _bank and _acc:
                                     _name = _lookup_name_api(_bank, _acc)
 
                                 if _bank or _acc:
-                                    # ✅ FIX: ghi thẳng vào session_state key của widget
-                                    # để Streamlit nhận đúng giá trị (value= bị bỏ qua khi widget có key)
                                     st.session_state["nf_name"] = _name
-                                    st.session_state["nf_bank"] = _bank   # selectbox lưu giá trị, không phải index
+                                    st.session_state["nf_bank"] = _bank
                                     st.session_state["nf_acc"]  = _acc
+                                    
+                                    # ÉP ĐÓNG PANEL NGAY LẬP TỨC ĐỂ CẮT VÒNG LẶP FILE UPLOADER
+                                    st.session_state.qr_scan_open = False
+                                    
                                     st.toast("✅ Đọc QR thành công! Kiểm tra form bên dưới nha~", icon="🎉")
                                     st.rerun()
                                 else:
@@ -573,17 +547,16 @@ with tab1:
                         except Exception as _e:
                             st.error(f"😵 Lỗi: {_e}")
 
-                if st.session_state.get("nf_bank") or st.session_state.get("nf_acc"):
-                    st.success(
-                        f"✅ **{st.session_state.get('nf_bank') or '(không rõ ngân hàng)'}** · "
-                        f"`{st.session_state.get('nf_acc','?')}` "
-                        + (f"· {st.session_state['nf_name']}" if st.session_state.get("nf_name") else "· (chưa có tên — nhập tay bên dưới)")
-                    )
-                st.divider()
+            # Hiển thị thông báo màu xanh báo thành công nếu có dữ liệu từ QR
+            if st.session_state.get("nf_bank") or st.session_state.get("nf_acc"):
+                st.success(
+                    f"✅ **{st.session_state.get('nf_bank') or '(không rõ ngân hàng)'}** · "
+                    f"`{st.session_state.get('nf_acc','?')}` "
+                    + (f"· {st.session_state['nf_name']}" if st.session_state.get("nf_name") else "· (chưa có tên — nhập tay bên dưới)")
+                )
+            st.divider()
 
             # ── Form nhập thông tin ──────────────────────────────────
-            # Dùng key= cho tất cả widget → session_state kiểm soát giá trị
-            # Khi QR decode xong, ta đã set st.session_state["nf_*"] → widget tự hiển thị đúng
             new_f_name = st.text_input("Tên người bạn:", key="nf_name", placeholder="vd: Bé Mèo 🐱")
             new_f_bank = st.selectbox("Ngân hàng (tuỳ):", BANK_LIST, key="nf_bank")
             new_f_acc  = st.text_input("Số tài khoản (tuỳ):", key="nf_acc")
@@ -596,7 +569,7 @@ with tab1:
                     st.session_state.members[new_id] = {
                         "name": new_f_name.strip(), "bank": new_f_bank, "acc": new_f_acc.strip()
                     }
-                    # Dọn dẹp
+                    # Dọn dẹp session state sau khi lưu thành công
                     for _k in ("nf_name","nf_bank","nf_acc","qr_scan_open"): st.session_state.pop(_k, None)
                     save_data()
                     st.toast(f"🎉 Đã thêm {new_f_name}!", icon="✨")
@@ -690,7 +663,6 @@ with tab1:
                 gp2.markdown(f"<div style='text-align:center;padding-top:5px;font-weight:700;'>Trang {st.session_state.group_page} / {tot_pg}</div>", unsafe_allow_html=True)
                 if gp3.button("➡️", key="g_next", disabled=(st.session_state.group_page == tot_pg), use_container_width=True):
                     st.session_state.group_page += 1; st.rerun()
-
 # ════════════════════════════════════════════
 #  TAB 2 – GHI HÓA ĐƠN
 # ════════════════════════════════════════════
