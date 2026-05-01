@@ -466,9 +466,9 @@ with tab1:
                         st.warning("Bạn chưa nhập mật khẩu mới kìa!")
                 else:
                     st.error("❌ Mật khẩu hiện tại không đúng!")
-    # ── Bạn bè ──
-    st.markdown("### 👥 Bạn bè của bạn")
-    c_add, c_list = st.columns([1, 1.5], gap="large")
+        # ── Bạn bè ──
+        st.markdown("### 👥 Bạn bè của bạn")
+        c_add, c_list = st.columns([1, 1.5], gap="large")
 
     with c_add:
         st.markdown("#### ➕ Kết bạn mới")
