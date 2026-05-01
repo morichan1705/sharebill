@@ -195,7 +195,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # ════════════════════════════════════════════
-#  2. HỆ THỐNG ĐĂNG NHẬP
+#  2. HỆ THỐNG ĐG NHẬP
 # ════════════════════════════════════════════
 if "logged_in" not in st.session_state:
     st.session_state.update(logged_in=False, username="", nickname="")
@@ -216,13 +216,13 @@ if not st.session_state.logged_in:
     </div>
     """, unsafe_allow_html=True)
 
-    tab_login, tab_reg = st.tabs(["🔑 Đăng nhập", "🌸 Đăng ký mới"])
+    tab_login, tab_reg = st.tabs(["🔑 Đg nhập", "🌸 Đg ký mới"])
 
     with tab_login:
         with st.container():
             l_user = st.text_input("👤 Tài khoản:", key="log_user", placeholder="Nhập ID của bạn...")
             l_pass = st.text_input("🔒 Mật khẩu:", type="password", key="log_pass", placeholder="••••••••")
-            if st.button("🚀 Đăng nhập nào!", type="primary", use_container_width=True):
+            if st.button("🚀 Đg nhập nào!", type="primary", use_container_width=True):
                 user_data = get_user_from_db(l_user)
                 if user_data and l_pass == user_data["password"]:
                     st.session_state.update(logged_in=True, username=l_user, nickname=user_data["nickname"])
@@ -231,7 +231,7 @@ if not st.session_state.logged_in:
                     st.error("😅 Sai tài khoản hoặc mật khẩu rồi!")
 
     with tab_reg:
-        r_user = st.text_input("🆔 Tên đăng nhập (ID):", key="reg_user", placeholder="vd: mori2024")
+        r_user = st.text_input("🆔 Tên đg nhập (ID):", key="reg_user", placeholder="vd: mori2024")
         r_pass = st.text_input("🔒 Mật khẩu:", type="password", key="reg_pass", placeholder="Đặt mật khẩu bí mật...")
         r_nick = st.text_input("✨ Bạn muốn được gọi là gì?", key="reg_nick", placeholder="vd: Mori, Bé Heo, ...")
         if st.button("🎉 Tạo tài khoản!", use_container_width=True):
@@ -242,7 +242,7 @@ if not st.session_state.logged_in:
                     "username": r_user, "password": r_pass, "nickname": r_nick,
                     "app_data": {"members": {}, "groups": {}, "history": []}
                 }).execute()
-                st.success("🎊 Đăng ký thành công! Qua tab Đăng nhập nha~")
+                st.success("🎊 Đg ký thành công! Qua tab Đg nhập nha~")
             else:
                 st.warning("🙈 Điền đủ thông tin giúp mình nha!")
     st.stop()
@@ -265,7 +265,7 @@ st.sidebar.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-if st.sidebar.button("🚪 Đăng xuất", use_container_width=True):
+if st.sidebar.button("🚪 Đg xuất", use_container_width=True):
     # Xoá toàn bộ data của user cũ khỏi session để user mới không thấy
     for _k in ["members", "groups", "history", "friend_page", "group_page",
                "current_items", "ai_date", "show_qr", "data_owner"]:
@@ -745,7 +745,7 @@ with tab2:
 
     st.divider()
     c_info1, c_info2 = st.columns(2)
-    b_title = c_info1.text_input("📌 Tiêu đề bill:", value="Đi ăn", placeholder="vd: Bữa tối sinh nhật 🎂")
+    b_title = c_info1.text_input("📌 Tiêu đề bill:", value="Đi ", placeholder="vd: Bữa tối sinh nhật 🎂")
     b_date = c_info2.text_input("📅 Thời gian:", value=st.session_state.get("ai_date", datetime.now().strftime("%d/%m/%Y %H:%M")))
     if total_bill == 0:
         total_bill = parse_amount(st.text_input("💰 Tổng bill (nhập nhanh nếu không chia món):", "0"))
@@ -776,22 +776,22 @@ with tab2:
 
     st.divider()
 
-    # ── Người ăn ──
-    st.markdown("#### 🍴 Ai tham gia ăn?")
+    # ── Người  ──
+    st.markdown("#### 🍴 Ai tham gia ?")
     use_g = st.selectbox("Chọn nhóm nhanh:", ["-- Chọn lẻ --"] + list(st.session_state.groups.keys()))
     def_m = st.session_state.groups.get(use_g, all_mem_ids_t2) if use_g != "-- Chọn lẻ --" else all_mem_ids_t2
-    b_cons = st.multiselect("Danh sách ăn:", def_m, default=def_m, format_func=get_name)
+    b_cons = st.multiselect("Danh sách :", def_m, default=def_m, format_func=get_name)
 
     if b_cons and total_bill > 0:
         # ĐÃ THÊM: Option Chia theo % và Số tiền cụ thể
-        method = st.radio("Cách chia tiền ăn:", ["Chia đều ✂️", "Theo tỉ lệ (%) 📊", "Số tiền cụ thể 💰", "Chia theo món lẻ 🍽️"], horizontal=True)
+        method = st.radio("Cách chia tiền :", ["Chia đều ✂️", "Theo tỉ lệ (%) 📊", "Số tiền cụ thể 💰", "Chia theo món lẻ 🍽️"], horizontal=True)
         splits = {c: 0 for c in b_cons}
         
         if "món lẻ" in method and st.session_state.current_items:
             pool = 0
             for idx, it in enumerate(st.session_state.current_items):
                 st.write(f"🍴 **{it['name']}** — {format_vn(it['price'] * it['qty'])}đ")
-                who = st.multiselect("Ai ăn?", b_cons, default=b_cons, format_func=get_pure_name, key=f"w_{idx}")
+                who = st.multiselect("Ai ?", b_cons, default=b_cons, format_func=get_pure_name, key=f"w_{idx}")
                 if who:
                     for w in who: splits[w] += (it["price"] * it["qty"]) / len(who)
                 else:
@@ -814,7 +814,7 @@ with tab2:
             cols = st.columns(len(b_cons))
             for i, c in enumerate(b_cons):
                 # Dùng key khác với key của người trả tiền (c_amt_ thay vì amt_)
-                splits[c] = cols[i].number_input(f"{get_pure_name(c)} ăn", 0, step=1000, key=f"c_amt_{c}")
+                splits[c] = cols[i].number_input(f"{get_pure_name(c)} ", 0, step=1000, key=f"c_amt_{c}")
                 
         # CHIA ĐỀU (Mặc định)
         else:
@@ -829,9 +829,9 @@ with tab2:
             elif abs(sum(payer_data.values()) - total_bill) > 1:
                 st.error(f"😵 Tổng ứng ({format_vn(sum(payer_data.values()))}đ) lệch với tổng bill ({format_vn(total_bill)}đ)!")
             
-            # ĐÃ THÊM: Kiểm tra tổng tiền ăn có khớp với tổng bill không
+            # ĐÃ THÊM: Kiểm tra tổng tiền  có khớp với tổng bill không
             elif abs(sum(splits.values()) - total_bill) > 1:
-                st.error(f"😵 Tổng tiền ăn được chia ({format_vn(sum(splits.values()))}đ) đang lệch với tổng bill ({format_vn(total_bill)}đ)! Bạn kiểm tra lại tỉ lệ/số tiền nhé.")
+                st.error(f"😵 Tổng tiền  được chia ({format_vn(sum(splits.values()))}đ) đang lệch với tổng bill ({format_vn(total_bill)}đ)! Bạn kiểm tra lại tỉ lệ/số tiền nhé.")
             
             else:
                 st.session_state.history.append({
