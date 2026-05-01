@@ -195,16 +195,14 @@ def init_supabase():
 supabase = init_supabase()
 
 # ════════════════════════════════════════════
-#  2. HỆ THỐNG ĐG NHẬP
+#  2. HỆ THỐNG ĐĂNG NHẬP & BẢO MẬT
 # ════════════════════════════════════════════
 if "logged_in" not in st.session_state:
     st.session_state.update(logged_in=False, username="", nickname="")
 
-
 def get_user_from_db(username):
     res = supabase.table("users").select("*").eq("username", username).execute()
     return res.data[0] if res.data else None
-
 
 if not st.session_state.logged_in:
     # ── Login header ──
@@ -216,37 +214,83 @@ if not st.session_state.logged_in:
     </div>
     """, unsafe_allow_html=True)
 
-    tab_login, tab_reg = st.tabs(["🔑 Đg nhập", "🌸 Đg ký mới"])
+    tab_login, tab_reg = st.tabs(["🔑 Đăng nhập", "🌸 Đăng ký mới"])
 
     with tab_login:
         with st.container():
             l_user = st.text_input("👤 Tài khoản:", key="log_user", placeholder="Nhập ID của bạn...")
             l_pass = st.text_input("🔒 Mật khẩu:", type="password", key="log_pass", placeholder="••••••••")
-            if st.button("🚀 Đg nhập nào!", type="primary", use_container_width=True):
+            if st.button("🚀 Đăng nhập nào!", type="primary", use_container_width=True):
                 user_data = get_user_from_db(l_user)
                 if user_data and l_pass == user_data["password"]:
                     st.session_state.update(logged_in=True, username=l_user, nickname=user_data["nickname"])
                     st.rerun()
                 else:
                     st.error("😅 Sai tài khoản hoặc mật khẩu rồi!")
+        
+        # --- CÁCH 2 & 3: TÍNH NĂNG QUÊN MẬT KHẨU & QUYỀN ADMIN ---
+        st.divider()
+        with st.expander("🆘 Quên mật khẩu? (Cứu hộ tại đây)"):
+            st.markdown("Nhập ID của bạn để hệ thống tìm kiếm:")
+            fg_user = st.text_input("ID đăng nhập:", key="fg_user")
+            
+            if fg_user:
+                user_data = get_user_from_db(fg_user)
+                if not user_data:
+                    st.error("❌ Không tìm thấy ID này trong hệ thống!")
+                else:
+                    app_data = user_data.get("app_data", {})
+                    sec_data = app_data.get("security", {})
+                    sec_q = sec_data.get("q", "Tài khoản này chưa cài câu hỏi bí mật (Tài khoản cũ). Hãy nhờ Admin cấp mã cứu hộ!")
+                    
+                    st.info(f"🤔 Câu hỏi bí mật của bạn: **{sec_q}**")
+                    fg_ans = st.text_input("Câu trả lời (Hoặc nhập Mã Admin):", key="fg_ans", type="password", placeholder="Nhập chữ thường không dấu...")
+                    
+                    # Lấy Master Key từ Secrets (nếu có), hoặc dùng mã mặc định
+                    MASTER_KEY = st.secrets.get("MASTER_KEY")
+                    
+                    if fg_ans:
+                        correct_ans = sec_data.get("a", "")
+                        # Chấp nhận nếu trả lời đúng câu hỏi bí mật HOẶC nhập đúng mã Master Key
+                        if (correct_ans and fg_ans.strip().lower() == correct_ans) or fg_ans == MASTER_KEY:
+                            st.success("✅ Xác thực thành công! Hãy đặt lại mật khẩu mới.")
+                            fg_new_pass = st.text_input("Mật khẩu mới:", type="password", key="fg_new_pass")
+                            if st.button("💾 Lưu mật khẩu mới", type="primary"):
+                                supabase.table("users").update({"password": fg_new_pass}).eq("username", fg_user).execute()
+                                st.success("🎉 Cứu hộ thành công! Hãy thu gọn mục này và đăng nhập lại ở trên nhé.")
+                        else:
+                            st.error("❌ Sai câu trả lời hoặc Mã Admin không hợp lệ!")
 
     with tab_reg:
-        r_user = st.text_input("🆔 Tên đg nhập (ID):", key="reg_user", placeholder="vd: mori2024")
+        r_user = st.text_input("🆔 Tên đăng nhập (ID):", key="reg_user", placeholder="vd: mori2024")
         r_pass = st.text_input("🔒 Mật khẩu:", type="password", key="reg_pass", placeholder="Đặt mật khẩu bí mật...")
         r_nick = st.text_input("✨ Bạn muốn được gọi là gì?", key="reg_nick", placeholder="vd: Mori, Bé Heo, ...")
+        
+        st.markdown("🔒 **Bảo mật (Phòng khi não cá vàng quên pass):**")
+        r_sec_q = st.selectbox("Chọn câu hỏi bí mật:", [
+            "Món ăn yêu thích nhất của nhóm là gì?",
+            "Tên thú cưng đầu tiên của bạn?",
+            "Biệt danh hồi nhỏ của bạn là gì?",
+            "Quán quen nhóm hay ngồi tên gì?"
+        ])
+        r_sec_a = st.text_input("Câu trả lời của bạn:", key="reg_sec_a", placeholder="Gợi ý: Nên viết chữ thường không dấu để dễ nhớ...")
+
         if st.button("🎉 Tạo tài khoản!", use_container_width=True):
             if get_user_from_db(r_user):
                 st.error("😬 ID này đã có người dùng rồi!")
-            elif r_user and r_pass and r_nick:
+            elif r_user and r_pass and r_nick and r_sec_a:
+                # Lưu câu trả lời dưới dạng chữ thường để lúc kiểm tra không bị lỗi viết hoa/viết thường
+                app_data = {
+                    "members": {}, "groups": {}, "history": [],
+                    "security": {"q": r_sec_q, "a": r_sec_a.strip().lower()}
+                }
                 supabase.table("users").insert({
-                    "username": r_user, "password": r_pass, "nickname": r_nick,
-                    "app_data": {"members": {}, "groups": {}, "history": []}
+                    "username": r_user, "password": r_pass, "nickname": r_nick, "app_data": app_data
                 }).execute()
-                st.success("🎊 Đg ký thành công! Qua tab Đg nhập nha~")
+                st.success("🎊 Đăng ký thành công! Qua tab Đăng nhập nha~")
             else:
-                st.warning("🙈 Điền đủ thông tin giúp mình nha!")
+                st.warning("🙈 Điền đủ tất cả các ô giúp mình nha!")
     st.stop()
-
 # ════════════════════════════════════════════
 #  3. DỮ LIỆU & HELPERS
 # ════════════════════════════════════════════
@@ -388,22 +432,40 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 #  TAB 1 – DANH BẠ & NHÓM
 # ════════════════════════════════════════════
 with tab1:
-    # ── Thông tin cá nhân ──
-    st.markdown("### 👤 Thông tin của bạn")
-    with st.expander("⚙️ Chỉnh sửa thông tin cá nhân"):
-        c0, c1, c2 = st.columns(3)
-        edit_my_name = c0.text_input("Tên hiển thị:", value=st.session_state.members[my_id].get("name", st.session_state.nickname))
-        edit_my_bank = c1.selectbox("Ngân hàng:", BANK_LIST, index=_bank_idx(st.session_state.members[my_id].get("bank", "")))
-        edit_my_acc = c2.text_input("Số tài khoản:", value=st.session_state.members[my_id].get("acc", ""))
-        if st.button("💾 Cập nhật thông tin", type="primary"):
-            st.session_state.members[my_id] = {"name": edit_my_name, "bank": edit_my_bank, "acc": edit_my_acc}
-            st.session_state.nickname = edit_my_name
-            save_data()
-            st.toast("✅ Đã lưu rồi nha~", icon="🌸")
-            st.rerun()
-
-    st.divider()
-
+        # ── Thông tin cá nhân ──
+        st.markdown("### 👤 Thông tin của bạn")
+        with st.expander("⚙️ Chỉnh sửa thông tin & Bảo mật"):
+            # Chỉnh sửa thông tin chung
+            c0, c1, c2 = st.columns(3)
+            edit_my_name = c0.text_input("Tên hiển thị:", value=st.session_state.members[my_id].get("name", st.session_state.nickname))
+            edit_my_bank = c1.selectbox("Ngân hàng:", BANK_LIST, index=_bank_idx(st.session_state.members[my_id].get("bank", "")))
+            edit_my_acc = c2.text_input("Số tài khoản:", value=st.session_state.members[my_id].get("acc", ""))
+            
+            if st.button("💾 Cập nhật thông tin", type="primary"):
+                st.session_state.members[my_id] = {"name": edit_my_name, "bank": edit_my_bank, "acc": edit_my_acc}
+                st.session_state.nickname = edit_my_name
+                save_data()
+                st.toast("✅ Đã lưu thông tin!", icon="🌸")
+                st.rerun()
+            
+            st.divider()
+            
+            # --- CÁCH 1: TÍNH NĂNG ĐỔI MẬT KHẨU KHI ĐANG ĐĂNG NHẬP ---
+            st.markdown("#### 🔑 Đổi mật khẩu")
+            col_p1, col_p2 = st.columns(2)
+            old_pass = col_p1.text_input("Mật khẩu hiện tại:", type="password", key="old_p")
+            new_pass = col_p2.text_input("Mật khẩu mới:", type="password", key="new_p")
+            
+            if st.button("Cập nhật mật khẩu"):
+                user_data = get_user_from_db(my_id)
+                if user_data and user_data["password"] == old_pass:
+                    if new_pass:
+                        supabase.table("users").update({"password": new_pass}).eq("username", my_id).execute()
+                        st.success("✅ Đã đổi mật khẩu thành công! Nhớ kỹ đừng quên nha~")
+                    else:
+                        st.warning("Bạn chưa nhập mật khẩu mới kìa!")
+                else:
+                    st.error("❌ Mật khẩu hiện tại không đúng!")
     # ── Bạn bè ──
     st.markdown("### 👥 Bạn bè của bạn")
     c_add, c_list = st.columns([1, 1.5], gap="large")
