@@ -411,9 +411,144 @@ with tab1:
     with c_add:
         st.markdown("#### ➕ Kết bạn mới")
         with st.container(border=True):
-            new_f_name = st.text_input("Tên người bạn:", placeholder="vd: Bé Mèo 🐱")
-            new_f_bank = st.selectbox("Ngân hàng (tuỳ):", BANK_LIST, key="new_f_bank")
-            new_f_acc = st.text_input("Số tài khoản (tuỳ):", key="new_f_acc")
+
+            # ── QR SCAN HELPER ──────────────────────────────────────
+            # BIN → tên ngân hàng (chuẩn NAPAS)
+            _BIN_MAP = {
+                "970422": "MB",   "970436": "VCB",  "970423": "TPB",
+                "970418": "BIDV", "970407": "TCB",  "970432": "VPB",
+                "970415": "CTG",  "970416": "ACB",  "970443": "SHB",
+                "970403": "STB",  "970441": "VIB",  "970426": "MSB",
+                "970454": "SCB",  "970430": "PGB",  "970400": "SEAB",
+                "970448": "OCB",  "970414": "OceanBank", "970438": "BVB",
+            }
+
+            def _parse_emv(s: str) -> dict:
+                """Tách chuỗi EMV QR thành dict {tag: value}."""
+                out, i = {}, 0
+                while i + 4 <= len(s):
+                    try:
+                        tag = s[i:i+2]
+                        ln  = int(s[i+2:i+4])
+                    except ValueError:
+                        break
+                    out[tag] = s[i+4: i+4+ln]
+                    i += 4 + ln
+                return out
+
+            def _decode_vietqr(raw: str):
+                """Trả về (bank_code, acc_no, acc_name) từ chuỗi QR VietQR."""
+                emv = _parse_emv(raw)
+                bank_code, acc_no, acc_name = "", "", emv.get("59", "").strip()
+                for tag in ("38", "26", "27"):   # VietQR thường ở tag 38
+                    if tag in emv:
+                        sub = _parse_emv(emv[tag])
+                        _bin = sub.get("01", "")
+                        _acc = sub.get("02", "")
+                        if _bin and _acc:
+                            bank_code = _BIN_MAP.get(_bin, "")
+                            acc_no    = _acc
+                            break
+                return bank_code, acc_no, acc_name
+
+            def _lookup_name_api(bank_code: str, acc_no: str) -> str:
+                """Gọi VietQR public API để lấy tên chủ TK (cần key)."""
+                try:
+                    import requests as _req
+                    vqr_client = st.secrets.get("VIETQR_CLIENT_ID", "")
+                    vqr_key    = st.secrets.get("VIETQR_API_KEY", "")
+                    # map bank_code → BIN ngược
+                    _CODE_BIN = {v: k for k, v in _BIN_MAP.items()}
+                    _bin = _CODE_BIN.get(bank_code, "")
+                    if not (_bin and vqr_client and vqr_key):
+                        return ""
+                    resp = _req.post(
+                        "https://api.vietqr.io/v2/lookup",
+                        json={"bin": _bin, "accountNumber": acc_no},
+                        headers={"x-client-id": vqr_client, "x-api-key": vqr_key},
+                        timeout=5,
+                    )
+                    data = resp.json()
+                    return data.get("data", {}).get("accountName", "")
+                except Exception:
+                    return ""
+
+            # ── UI: toggle quét QR ──────────────────────────────────
+            if "qr_scan_open" not in st.session_state:
+                st.session_state.qr_scan_open = False
+
+            if st.button(
+                "📷 Quét QR ngân hàng" if not st.session_state.qr_scan_open else "✖️ Đóng quét QR",
+                use_container_width=True,
+            ):
+                st.session_state.qr_scan_open = not st.session_state.qr_scan_open
+                # reset kết quả cũ khi đóng
+                if not st.session_state.qr_scan_open:
+                    for _k in ("qr_bank","qr_acc","qr_name"): st.session_state.pop(_k, None)
+                st.rerun()
+
+            if st.session_state.qr_scan_open:
+                st.markdown(
+                    "<div style='font-size:0.8rem;color:#aaa;margin-bottom:4px;'>"
+                    "📌 Chụp / tải ảnh QR VietQR từ app ngân hàng của bạn bè</div>",
+                    unsafe_allow_html=True,
+                )
+                _qr_src = st.radio("Nguồn ảnh:", ["📷 Camera", "🖼️ Upload file"], horizontal=True, key="qr_src_radio")
+                _qr_img_raw = None
+                if "Camera" in _qr_src:
+                    _qr_img_raw = st.camera_input("Chụp mã QR:", key="qr_cam_input", label_visibility="collapsed")
+                else:
+                    _qr_img_raw = st.file_uploader("Tải ảnh QR:", type=["jpg","png","jpeg","webp"], key="qr_file_input", label_visibility="collapsed")
+
+                if _qr_img_raw:
+                    with st.spinner("🔍 Đang đọc mã QR..."):
+                        try:
+                            from pyzbar.pyzbar import decode as _pyz_decode
+                            import PIL.Image as _PILImg
+                            _img   = _PILImg.open(_qr_img_raw).convert("RGB")
+                            _codes = _pyz_decode(_img)
+                            if not _codes:
+                                st.warning("😕 Không tìm thấy mã QR trong ảnh. Thử chụp gần hơn nha~")
+                            else:
+                                _raw = _codes[0].data.decode("utf-8")
+                                _bank, _acc, _name = _decode_vietqr(_raw)
+
+                                # Nếu chưa có tên → thử API
+                                if not _name and _bank and _acc:
+                                    _name = _lookup_name_api(_bank, _acc)
+
+                                if _bank or _acc:
+                                    st.session_state.qr_bank = _bank
+                                    st.session_state.qr_acc  = _acc
+                                    st.session_state.qr_name = _name
+                                    st.toast("✅ Đọc QR thành công!", icon="🎉")
+                                    st.rerun()
+                                else:
+                                    st.warning("🤔 Đọc được QR nhưng không phải QR ngân hàng VietQR. Thử ảnh khác nha!")
+                        except ImportError:
+                            st.error("⚠️ Thiếu thư viện `pyzbar`. Thêm `pyzbar` vào requirements.txt và `libzbar0` vào packages.txt nhé!")
+                        except Exception as _e:
+                            st.error(f"😵 Lỗi đọc QR: {_e}")
+
+                # Hiển thị kết quả đọc được
+                if st.session_state.get("qr_bank") or st.session_state.get("qr_acc"):
+                    st.success(
+                        f"✅ Đọc được: **{st.session_state.get('qr_bank','?')}** · "
+                        f"`{st.session_state.get('qr_acc','?')}` "
+                        + (f"· {st.session_state.get('qr_name','')}" if st.session_state.get('qr_name') else "")
+                    )
+                    st.caption("👇 Thông tin đã điền vào form bên dưới. Kiểm tra lại rồi bấm Thêm nha~")
+                st.divider()
+
+            # ── Form nhập tay (tự điền nếu vừa quét QR) ────────────
+            _pre_name = st.session_state.get("qr_name", "")
+            _pre_bank = st.session_state.get("qr_bank", "")
+            _pre_acc  = st.session_state.get("qr_acc",  "")
+
+            new_f_name = st.text_input("Tên người bạn:", value=_pre_name, placeholder="vd: Bé Mèo 🐱")
+            new_f_bank = st.selectbox("Ngân hàng (tuỳ):", BANK_LIST, index=_bank_idx(_pre_bank), key="new_f_bank")
+            new_f_acc  = st.text_input("Số tài khoản (tuỳ):", value=_pre_acc, key="new_f_acc")
+
             if st.button("➕ Thêm bạn này!", type="primary", use_container_width=True):
                 if not new_f_name.strip():
                     st.warning("🙈 Nhập tên bạn đi nè!")
@@ -422,6 +557,8 @@ with tab1:
                     st.session_state.members[new_id] = {
                         "name": new_f_name.strip(), "bank": new_f_bank, "acc": new_f_acc.strip()
                     }
+                    # Dọn dẹp dữ liệu QR tạm
+                    for _k in ("qr_bank","qr_acc","qr_name","qr_scan_open"): st.session_state.pop(_k, None)
                     save_data()
                     st.toast(f"🎉 Đã thêm {new_f_name}!", icon="✨")
                     st.rerun()
