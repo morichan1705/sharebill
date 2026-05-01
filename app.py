@@ -471,10 +471,6 @@ with tab1:
         st.markdown("### 👥 Bạn bè của bạn")
         c_add, c_list = st.columns([1, 1.5], gap="large") # Dòng này đã được lùi ra cho thẳng hàng với st.markdown
 
-    with c_add:
-        st.markdown("#### ➕ Kết bạn mới")
-        with st.container(border=True):
-
             # ── QR SCAN HELPERS ─────────────────────────────────────
             _BIN_MAP = {
                 "970422": "MB",   "970436": "VCB",  "970423": "TPB",
